@@ -1,7 +1,12 @@
-// Vaseline Lip Care 💋 — Service Worker
-// Caches app shell & assets for 100% offline use on iPhone
+﻿// ╔══════════════════════════════════════════════════════════╗
+// ║        Vaseline Lip Care 💋 — Unified Service Worker     ║
+// ║        Offline PWA Caching + Firebase Cloud Messaging    ║
+// ╚══════════════════════════════════════════════════════════╝
 
-const CACHE_NAME = 'vaseline-care-v18';
+importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
+
+const CACHE_NAME = 'vaseline-care-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -20,9 +25,7 @@ const ASSETS = [
 // Install — cache app shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
   self.skipWaiting();
 });
@@ -32,9 +35,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     })
   );
@@ -46,7 +47,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).catch(() => {
-        // Offline fallback
         if (event.request.destination === 'document') {
           return caches.match('./index.html');
         }
@@ -55,7 +55,44 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// ── Native Web Push Event Listener (wakes up phone when app is closed) ──
+// ── Firebase Cloud Messaging Initialization ───────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCvl579wZu7MKtLmRunfZ0xJgiqpto12C8",
+  authDomain: "mishu-lipcare-df5c3.firebaseapp.com",
+  projectId: "mishu-lipcare-df5c3",
+  storageBucket: "mishu-lipcare-df5c3.firebasestorage.app",
+  messagingSenderId: "11302655153",
+  appId: "1:11302655153:web:bb5b475d0c153263253e90",
+  measurementId: "G-37PV0YQQTL"
+};
+
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+  }
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    const title = payload.notification?.title || payload.data?.title || 'Vaseline Lip Care 💋';
+    const body = payload.notification?.body || payload.data?.body || 'Time to put Vaseline on those gorgeous lips! 💋';
+
+    const options = {
+      body: body,
+      icon: './icons/apple-touch-icon.png',
+      badge: './icons/icon-192.png',
+      vibrate: [300, 100, 300, 100, 400],
+      tag: 'partner-love-tap',
+      renotify: true,
+      data: { url: './' }
+    };
+
+    self.registration.showNotification(title, options);
+  });
+} catch (e) {
+  console.log('Firebase worker init note:', e);
+}
+
+// ── Native Web Push Event Listener ────────────────────────
 self.addEventListener('push', (event) => {
   let title = 'Vaseline Lip Care 💋';
   let body = 'Time to moisturize those gorgeous lips! 💋';
@@ -64,8 +101,8 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       const data = event.data.json();
-      title = data.title || title;
-      body = data.message || data.body || body;
+      title = data.title || data.notification?.title || title;
+      body = data.message || data.body || data.notification?.body || body;
       tag = data.tag || tag;
     } catch (e) {
       body = event.data.text() || body;
@@ -101,112 +138,77 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// ── ntfy.sh Background Partner Tap Listener ───────────────
-// Receives messages from main app to start/stop background listening
+// ── Background Partner Tap Listener ───────────────────────
 let ntfyReader = null;
-let ntfyRole = null;
 
 self.addEventListener('message', (event) => {
   const data = event.data;
   if (!data) return;
 
   if (data.type === 'START_NTFY_LISTENER') {
-    ntfyRole = data.role;
     const topic = `${data.topic}-lipcare`;
     startNtfyListener(topic, data.role);
   }
 });
 
-const CUTE_MESSAGES = [
-  '💋 Time to put Vaseline on those gorgeous lips!',
-  '🌸 Your lips are whispering "Vaseline please!" 🥰',
-  '💙 Keep those lips soft, protected & glowing! ✨',
-  '👑 Your lips deserve the royal blue Vaseline treatment!',
-  '💧 Soft lips loading… Apply your Vaseline now! ✨',
-  '🦋 Butterfly kisses need soft lips! Vaseline time!',
-  '😘 A little Vaseline goes a long way! Moisturize! 💋',
-  '⭐ Shine bright! Vaseline time, superstar! ⭐',
-];
-
-function randomMessage() {
-  return CUTE_MESSAGES[Math.floor(Math.random() * CUTE_MESSAGES.length)];
-}
-
 async function startNtfyListener(topic, role) {
-  // Stop any existing listener
   if (ntfyReader) {
     try { ntfyReader.cancel(); } catch (e) {}
     ntfyReader = null;
   }
 
-  const listen = async () => {
-    try {
-      // Use ?since=now so ntfy never replays old/stale messages when opening the app!
-      const response = await fetch(`https://ntfy.sh/${topic}/sse?since=now`, {
-        headers: { 'Accept': 'text/event-stream' }
-      });
+  try {
+    const response = await fetch(`https://ntfy.sh/${topic}/sse?since=now`, {
+      headers: { 'Accept': 'text/event-stream' }
+    });
 
-      if (!response.ok) return;
-      const reader = response.body.getReader();
-      ntfyReader = reader;
-      const decoder = new TextDecoder();
-      let buffer = '';
+    if (!response.ok) return;
+    const reader = response.body.getReader();
+    ntfyReader = reader;
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() || '';
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
 
-        for (const block of parts) {
-          const dataLine = block.split('\n').find(l => l.startsWith('data:'));
-          if (!dataLine) continue;
-          try {
-            const msg = JSON.parse(dataLine.slice(5));
-            if (!msg || !msg.message) continue;
+      for (const block of parts) {
+        const dataLine = block.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+        try {
+          const msg = JSON.parse(dataLine.slice(5));
+          if (!msg || !msg.message) continue;
 
-            // Ignore messages older than 15 seconds (double protection against old cache)
-            if (msg.time && (Date.now() / 1000 - msg.time > 15)) continue;
+          if (msg.time && (Date.now() / 1000 - msg.time > 15)) continue;
+          if (msg.message.startsWith(`FROM:${role}`)) continue;
 
-            // Skip messages sent by self
-            if (msg.message.startsWith(`FROM:${role}`)) continue;
+          let body = msg.message;
+          let senderName = 'Your partner';
+          const fromMatch = body.match(/^FROM:(\w+) /);
+          if (fromMatch) {
+            senderName = fromMatch[1];
+            body = body.replace(/^FROM:\w+ /, '');
+          }
 
-            // Extract sender name from message prefix
-            let body = msg.message;
-            let senderName = 'Your partner';
-            const fromMatch = body.match(/^FROM:(\w+) /);
-            if (fromMatch) {
-              senderName = fromMatch[1];
-              body = body.slice(fromMatch[0].length);
-            }
+          const notifTitle = `💌 Vaseline Love Tap from ${senderName}!`;
+          self.registration.showNotification(notifTitle, {
+            body: body,
+            icon: './icons/apple-touch-icon.png',
+            badge: './icons/icon-192.png',
+            vibrate: [300, 100, 300, 100, 400],
+            tag: 'partner-love-tap',
+            renotify: true
+          });
 
-            // Show OS-level notification (works even when app is closed)
-            await self.registration.showNotification(`💌 ${senderName} tapped the jar for you!`, {
-              body: body || randomMessage(),
-              icon: './icons/apple-touch-icon.png',
-              badge: './icons/icon-192.png',
-              vibrate: [300, 100, 300, 100, 400],
-              tag: 'partner-love-tap',
-              renotify: true,
-              requireInteraction: false,
-            });
-
-            // Forward to open clients (app windows) so they can animate
-            const clients = await self.clients.matchAll({ type: 'window' });
-            for (const client of clients) {
-              client.postMessage({ type: 'PARTNER_TAP', from: senderName });
-            }
-          } catch (parseErr) {}
-        }
+          self.clients.matchAll({ type: 'window' }).then((clients) => {
+            clients.forEach((c) => c.postMessage({ type: 'PARTNER_TAP', from: senderName }));
+          });
+        } catch (e) {}
       }
-    } catch (err) {
-      // Network error — reconnect after 5s
     }
-    await new Promise(r => setTimeout(r, 5000));
-    listen(); // Reconnect
-  };
-
-  listen();
+  } catch (err) {}
 }
