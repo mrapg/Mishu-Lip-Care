@@ -689,6 +689,28 @@ body {
   box-shadow: 2px 2px 0px var(--vaseline-navy);
 }
 
+.btn-notif-enable {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: var(--vaseline-ice);
+  border: 2px solid var(--vaseline-blue);
+  color: var(--vaseline-blue-dark);
+  border-radius: var(--block-radius-sm);
+  box-shadow: 2px 2px 0px var(--vaseline-navy);
+  margin-top: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-notif-enable.granted {
+  background: #E8F5E9;
+  border-color: #2E7D32;
+  color: #1B5E20;
+  box-shadow: none;
+}
+
 /* ── Big Start Button ───────────────────────────────────── */
 .btn-start {
   width: 100%;

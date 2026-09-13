@@ -67,13 +67,39 @@ const roleMishuBtn = document.getElementById('role-mishu');
 const roleAnandBtn = document.getElementById('role-anand');
 const pairCodeInput = document.getElementById('pair-code-input');
 const savePairBtn = document.getElementById('save-pair-btn');
+const enableNotifBtn = document.getElementById('enable-notif-btn');
+
+// ── Shared Audio Context & Auto-Unlock ─────────────────────
+let sharedAudioCtx = null;
+
+function getAudioContext() {
+  if (!sharedAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      sharedAudioCtx = new AudioContextClass();
+    }
+  }
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume().catch(() => {});
+  }
+  return sharedAudioCtx;
+}
+
+function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+['touchstart', 'touchend', 'pointerdown', 'click'].forEach((evt) => {
+  window.addEventListener(evt, unlockAudio, { passive: true });
+});
 
 // ── Audio Tone Generator (Soft Chime) ─────────────────────
 function playCuteChime() {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
     const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (Cute Major Arpeggio)
     notes.forEach((freq, idx) => {
@@ -94,9 +120,7 @@ function playCuteChime() {
       osc.start(startTime);
       osc.stop(startTime + 0.4);
     });
-  } catch (e) {
-    // AudioContext might be blocked until user gesture, ignore safely
-  }
+  } catch (e) {}
 }
 
 // ── Fisher-Yates Message Shuffler ─────────────────────────
@@ -267,63 +291,91 @@ function createHeartsBurst() {
 }
 
 // ── Tactile Physical Vibration & Haptics ──────────────────
-function triggerTactileVibration(pattern = [100, 50, 100]) {
-  // 1. Native Vibration API (Android, Chrome, and supported mobile browsers)
+function triggerTactileVibration(isRemote = false) {
+  // 1. Hardware motor vibration (Android & supporting browsers)
   if ('vibrate' in navigator) {
     try {
-      navigator.vibrate(pattern);
+      if (isRemote) {
+        navigator.vibrate([250, 100, 250, 100, 350]);
+      } else {
+        const res = navigator.vibrate([100, 50, 100]);
+        if (!res) navigator.vibrate(120);
+      }
     } catch (e) {}
   }
 
-  // 2. Synthesize Physical Haptic Buzz via Web Audio (Vibrates speaker & chassis on iOS)
+  // 2. Physical Acoustic Haptic Rumble (Vibrates iPhone & Android speaker housing)
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    if (ctx.state === 'suspended') {
-      ctx.resume();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const pulses = isRemote ? 3 : 2;
+
+    for (let i = 0; i < pulses; i++) {
+      const startTime = now + i * 0.15;
+
+      // Deep resonant pulse (140Hz -> 75Hz) - within phone speaker passband
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle'; // generates rich odd harmonics for tactile vibration
+      osc.frequency.setValueAtTime(140, startTime);
+      osc.frequency.exponentialRampToValueAtTime(75, startTime + 0.11);
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.linearRampToValueAtTime(0.9, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.12);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + 0.13);
+
+      // Tactile click transient (1500Hz -> 300Hz)
+      const click = ctx.createOscillator();
+      const clickGain = ctx.createGain();
+
+      click.type = 'sine';
+      click.frequency.setValueAtTime(1500, startTime);
+      click.frequency.exponentialRampToValueAtTime(300, startTime + 0.025);
+
+      clickGain.gain.setValueAtTime(0.35, startTime);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.025);
+
+      click.connect(clickGain);
+      clickGain.connect(ctx.destination);
+
+      click.start(startTime);
+      click.stop(startTime + 0.03);
     }
-
-    let delay = 0;
-    pattern.forEach((duration, index) => {
-      // Vibrate on even indexes
-      if (index % 2 === 0) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        // 45Hz sub-bass produces physical tactile rumble in phone housing
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(45, ctx.currentTime + delay / 1000);
-
-        const startTime = ctx.currentTime + delay / 1000;
-        const endTime = startTime + duration / 1000;
-
-        gain.gain.setValueAtTime(0.01, startTime);
-        gain.gain.linearRampToValueAtTime(0.7, startTime + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, endTime);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(startTime);
-        osc.stop(endTime);
-      }
-      delay += duration;
-    });
-  } catch (e) {}
+  } catch (e) {
+    console.error('Haptic acoustic error:', e);
+  }
 }
 
 // ── Interactive Jar Tap Interaction ───────────────────────
+let lastTapTime = 0;
+
 function handleJarTap(e) {
-  if (e) e.preventDefault();
+  if (e && e.cancelable) {
+    e.preventDefault();
+  }
+
+  const now = Date.now();
+  if (now - lastTapTime < 180) return; // Debounce rapid multi-touch / click duplicate
+  lastTapTime = now;
 
   // 1. Immediate local vibration
-  triggerTactileVibration([90, 40, 90]);
+  triggerTactileVibration(false);
 
   // 2. Trigger squish animation
-  balmWrapper.classList.remove('squish-pop');
-  void balmWrapper.offsetWidth;
-  balmWrapper.classList.add('squish-pop');
+  if (balmWrapper) {
+    balmWrapper.classList.remove('squish-pop');
+    void balmWrapper.offsetWidth;
+    balmWrapper.classList.add('squish-pop');
+  }
 
   // 3. Spawn small floating heart / drop above jar
   spawnTapParticle();
@@ -451,7 +503,7 @@ function sendPartnerTap() {
 
 function handleIncomingPartnerTap(data) {
   // 1. Long sweet heartbeat vibration pattern on her phone!
-  triggerTactileVibration([220, 90, 220, 90, 320]);
+  triggerTactileVibration(true);
 
   // 2. Play cute chime
   playCuteChime();
@@ -473,17 +525,27 @@ function handleIncomingPartnerTap(data) {
   // 4. Slide in Partner Toast Banner
   showPartnerToast(data.from);
 
-  // 5. If phone screen is locked / app backgrounded, fire system notification
-  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-    try {
-      new Notification(`💌 Vaseline Love Tap from ${data.from}!`, {
-        body: `${data.from} tapped the Vaseline jar for you! 💋 Keep those lips soft & moisturized!`,
-        icon: 'icons/apple-touch-icon.png',
-        badge: 'icons/icon-192.png',
-        tag: 'partner-love-tap',
-        renotify: true
+  // 5. Fire system notification WITH hardware motor vibration pattern!
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notifTitle = `💌 Vaseline Love Tap from ${data.from}!`;
+    const notifOptions = {
+      body: `${data.from} tapped the Vaseline jar for you! 💋 Keep those lips soft & moisturized!`,
+      icon: 'icons/apple-touch-icon.png',
+      badge: 'icons/icon-192.png',
+      vibrate: [300, 100, 300, 100, 400],
+      tag: 'partner-love-tap',
+      renotify: true
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(notifTitle, notifOptions);
       });
-    } catch (e) {}
+    } else {
+      try {
+        new Notification(notifTitle, notifOptions);
+      } catch (e) {}
+    }
   }
 }
 
@@ -639,8 +701,57 @@ startBtn.addEventListener('click', startTimer);
 doneBtn.addEventListener('click', hidePopup);
 snoozeBtn.addEventListener('click', snooze);
 
+// Balm stage listeners (pointerdown for instantaneous haptic feedback)
 if (balmStage) {
+  balmStage.addEventListener('pointerdown', handleJarTap);
   balmStage.addEventListener('click', handleJarTap);
+}
+
+// Notification Permission Helper
+function setupNotificationButton() {
+  if (!enableNotifBtn) return;
+
+  function updateBtnStatus() {
+    if (!('Notification' in window)) {
+      enableNotifBtn.style.display = 'none';
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      enableNotifBtn.textContent = '✓ Remote Vibrations Active 🔔';
+      enableNotifBtn.classList.add('granted');
+    } else {
+      enableNotifBtn.textContent = '🔔 Allow Remote Vibrations & Alerts';
+      enableNotifBtn.classList.remove('granted');
+    }
+  }
+
+  updateBtnStatus();
+
+  enableNotifBtn.addEventListener('click', () => {
+    if (!('Notification' in window)) {
+      alert('Notifications are not supported in this browser.');
+      return;
+    }
+
+    // Trigger test vibration
+    triggerTactileVibration(false);
+
+    Notification.requestPermission().then((permission) => {
+      updateBtnStatus();
+      if (permission === 'granted') {
+        triggerTactileVibration(true);
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then((reg) => {
+            reg.showNotification('💋 Vibrations Enabled!', {
+              body: 'Your phone will now buzz when partner taps the jar!',
+              icon: 'icons/apple-touch-icon.png',
+              vibrate: [200, 100, 200]
+            });
+          });
+        }
+      }
+    });
+  });
 }
 
 // Partner Role Selection
@@ -686,6 +797,7 @@ function init() {
   if (pairCodeInput) pairCodeInput.value = pairCode;
   setRole(currentRole);
   initPartnerSync();
+  setupNotificationButton();
 
   registerServiceWorker();
 }
