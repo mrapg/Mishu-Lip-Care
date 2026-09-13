@@ -207,8 +207,10 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  perspective: 900px;
-  touch-action: manipulation;
+  perspective: 1000px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .balm-stage {
@@ -219,7 +221,13 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+  transform-style: preserve-3d;
+}
+
+.balm-stage.is-dragging {
+  cursor: grabbing;
 }
 
 .balm-wrapper {
@@ -229,10 +237,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: jarFloat 3.6s ease-in-out infinite;
-  transform-origin: center bottom;
-  transition: transform 0.15s ease-out;
+  transform-origin: center center;
+  transform-style: preserve-3d;
+  will-change: transform;
   z-index: 2;
+}
+
+.balm-wrapper.idle-floating {
+  animation: jarFloat 3.6s ease-in-out infinite;
 }
 
 /* Subtle cyan glow aura behind the voxel jar */
@@ -258,11 +270,6 @@ body {
 }
 
 /* Tap Squish / Bounce animation on click */
-.balm-stage:active .balm-wrapper {
-  animation: none;
-  transform: scale(0.92, 1.08) translateY(6px);
-}
-
 .balm-wrapper.squish-pop {
   animation: squishPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
@@ -281,8 +288,11 @@ body {
   background: radial-gradient(ellipse, rgba(0, 26, 77, 0.35) 0%, rgba(0, 26, 77, 0.1) 50%, transparent 70%);
   border-radius: 50%;
   margin-top: -6px;
-  animation: shadowPulse 3.6s ease-in-out infinite;
   z-index: 1;
+}
+
+.balm-shadow.idle-floating {
+  animation: shadowPulse 3.6s ease-in-out infinite;
 }
 
 @keyframes jarFloat {

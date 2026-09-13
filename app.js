@@ -55,6 +55,7 @@ const snoozeBtn = document.getElementById('snooze-btn');
 const heartsContainer = document.getElementById('hearts-container');
 const balmStage = document.getElementById('balm-stage');
 const balmWrapper = document.getElementById('balm-wrapper');
+const balmShadow = document.getElementById('balm-shadow');
 
 // Partner Sync Elements
 const partnerToast = document.getElementById('partner-toast');
@@ -355,32 +356,169 @@ function triggerTactileVibration(isRemote = false) {
   }
 }
 
-// ── Interactive Jar Tap Interaction ───────────────────────
+// ── Fidget Spinner Rotation ────────────────────────────────
+(function initFidgetSpinner() {
+  if (!balmStage || !balmWrapper) return;
+
+  // Current rotation angles
+  let rotX = 0;
+  let rotY = 0;
+
+  // Inertia / momentum
+  let velX = 0;
+  let velY = 0;
+  let rafId = null;
+
+  // Drag tracking
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let lastX = 0;
+  let lastY = 0;
+  let totalMoveDistance = 0;
+  const TAP_THRESHOLD = 10; // px — if drag < this, treat as tap
+
+  let idleTimer = null;
+
+  function stopIdle() {
+    if (balmWrapper) balmWrapper.classList.remove('idle-floating');
+    if (balmShadow) balmShadow.classList.remove('idle-floating');
+    cancelAnimationFrame(rafId);
+  }
+
+  function resumeIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (balmWrapper) balmWrapper.classList.add('idle-floating');
+      if (balmShadow) balmShadow.classList.add('idle-floating');
+      // Smoothly reset rotation
+      const easeToZero = () => {
+        rotX *= 0.85;
+        rotY *= 0.85;
+        applyTransform();
+        if (Math.abs(rotX) > 0.5 || Math.abs(rotY) > 0.5) {
+          requestAnimationFrame(easeToZero);
+        } else {
+          rotX = 0; rotY = 0;
+          balmWrapper.style.transform = '';
+        }
+      };
+      requestAnimationFrame(easeToZero);
+    }, 2200);
+  }
+
+  function applyTransform() {
+    // Clamp vertical tilt for a nice fidget feel
+    const clampedX = Math.max(-55, Math.min(55, rotX));
+    balmWrapper.style.animation = 'none';
+    balmWrapper.style.transform = `rotateX(${clampedX}deg) rotateY(${rotY}deg)`;
+  }
+
+  function spinInertia() {
+    if (Math.abs(velX) < 0.1 && Math.abs(velY) < 0.1) return;
+    rotX += velX;
+    rotY += velY;
+    velX *= 0.93;
+    velY *= 0.93;
+    applyTransform();
+    rafId = requestAnimationFrame(spinInertia);
+  }
+
+  function onPointerDown(e) {
+    if (e.type === 'pointerdown') {
+      balmStage.setPointerCapture(e.pointerId);
+    }
+
+    stopIdle();
+    isDragging = true;
+    totalMoveDistance = 0;
+    cancelAnimationFrame(rafId);
+
+    startX = lastX = e.clientX ?? e.touches?.[0].clientX;
+    startY = lastY = e.clientY ?? e.touches?.[0].clientY;
+
+    balmStage.classList.add('is-dragging');
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+
+    const curX = e.clientX ?? e.touches?.[0].clientX;
+    const curY = e.clientY ?? e.touches?.[0].clientY;
+
+    const dx = curX - lastX;
+    const dy = curY - lastY;
+
+    totalMoveDistance += Math.abs(dx) + Math.abs(dy);
+
+    // Horizontal drag → rotateY (spin), vertical drag → rotateX (tilt)
+    velY = dx * 0.9;
+    velX = -dy * 0.5;
+
+    rotY += velY;
+    rotX += velX;
+
+    applyTransform();
+
+    lastX = curX;
+    lastY = curY;
+  }
+
+  function onPointerUp(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    balmStage.classList.remove('is-dragging');
+
+    if (totalMoveDistance < TAP_THRESHOLD) {
+      // Short movement = it was a tap → fire the love tap!
+      rotX = 0; rotY = 0;
+      applyTransform();
+      handleJarTap(null);
+    } else {
+      // Long drag = fidget spin → apply momentum inertia
+      rafId = requestAnimationFrame(spinInertia);
+    }
+
+    resumeIdle();
+  }
+
+  // Pointer events (modern, works on mobile & desktop)
+  balmStage.addEventListener('pointerdown', onPointerDown, { passive: false });
+  balmStage.addEventListener('pointermove', onPointerMove, { passive: false });
+  balmStage.addEventListener('pointerup', onPointerUp);
+  balmStage.addEventListener('pointercancel', onPointerUp);
+
+  // Touch fallback for older iOS
+  balmStage.addEventListener('touchstart', onPointerDown, { passive: false });
+  balmStage.addEventListener('touchmove', onPointerMove, { passive: false });
+  balmStage.addEventListener('touchend', onPointerUp, { passive: false });
+})();
+
+// ── Tap Action (vibrate + squish + broadcast) ─────────────
 let lastTapTime = 0;
 
 function handleJarTap(e) {
-  if (e && e.cancelable) {
-    e.preventDefault();
-  }
+  if (e && e.cancelable) e.preventDefault();
 
   const now = Date.now();
-  if (now - lastTapTime < 180) return; // Debounce rapid multi-touch / click duplicate
+  if (now - lastTapTime < 180) return; // Debounce duplicate events
   lastTapTime = now;
 
-  // 1. Immediate local vibration
+  // 1. Vibrate phone
   triggerTactileVibration(false);
 
-  // 2. Trigger squish animation
+  // 2. Squish-pop animation
   if (balmWrapper) {
     balmWrapper.classList.remove('squish-pop');
     void balmWrapper.offsetWidth;
     balmWrapper.classList.add('squish-pop');
   }
 
-  // 3. Spawn small floating heart / drop above jar
+  // 3. Floating heart particles
   spawnTapParticle();
 
-  // 4. Broadcast real-time tap to partner's phone
+  // 4. Send partner love tap
   sendPartnerTap();
 }
 
@@ -701,11 +839,7 @@ startBtn.addEventListener('click', startTimer);
 doneBtn.addEventListener('click', hidePopup);
 snoozeBtn.addEventListener('click', snooze);
 
-// Balm stage listeners (pointerdown for instantaneous haptic feedback)
-if (balmStage) {
-  balmStage.addEventListener('pointerdown', handleJarTap);
-  balmStage.addEventListener('click', handleJarTap);
-}
+// Balm stage interaction is handled by the Fidget Spinner IIFE above
 
 // Notification Permission Helper
 function setupNotificationButton() {
