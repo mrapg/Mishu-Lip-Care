@@ -15,7 +15,8 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <title>Vaseline Lip Care 💋</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@600;700&family=Silkscreen:wght@700&family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
+  <script type="module" src="lib/model-viewer.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -47,17 +48,30 @@
       <span class="sparkle s5">⭐</span>
       <span class="sparkle s6">🫧</span>
 
-      <!-- 3D Vaseline Jar Cube -->
+      <!-- 3D Vaseline Jar (WebGL Model) -->
       <div class="balm-stage" id="balm-stage">
         <div class="balm-wrapper idle-floating" id="balm-wrapper">
-          <div class="jar-cube" id="jar-cube">
-            <div class="jar-face jar-front"><img src="textures/front.png" alt="Front" draggable="false"></div>
-            <div class="jar-face jar-back"><img src="textures/back.png" alt="Back" draggable="false"></div>
-            <div class="jar-face jar-left"><img src="textures/left.png" alt="Left" draggable="false"></div>
-            <div class="jar-face jar-right"><img src="textures/right.png" alt="Right" draggable="false"></div>
-            <div class="jar-face jar-top"><img src="textures/top.png" alt="Top" draggable="false"></div>
-            <div class="jar-face jar-bottom"><img src="textures/bottom.png" alt="Bottom" draggable="false"></div>
-          </div>
+          <model-viewer
+            id="balm-model-viewer"
+            src="vaseline-model.glb"
+            alt="Vaseline 3D Jar"
+            camera-controls
+            touch-action="none"
+            disable-zoom
+            disable-pan
+            auto-rotate
+            auto-rotate-delay="2500"
+            rotation-per-second="20deg"
+            interaction-prompt="none"
+            shadow-intensity="1.5"
+            shadow-softness="0.75"
+            exposure="1.05"
+            camera-orbit="0deg 75deg auto"
+            min-camera-orbit="auto 35deg auto"
+            max-camera-orbit="auto 115deg auto"
+            interpolation-decay="200"
+          >
+          </model-viewer>
           <div class="balm-aura"></div>
         </div>
         <!-- Dynamic Ground Shadow -->
@@ -188,6 +202,6 @@
   </div>
 
   <script src="lib/mqtt.min.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

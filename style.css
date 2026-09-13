@@ -247,82 +247,22 @@ body {
   animation: jarFloat 3.6s ease-in-out infinite;
 }
 
-/* ── 3D Jar Cube ──────────────────────────────────────────── */
-.jar-cube {
-  position: relative;
-  width: 160px;
-  height: 150px;
-  transform-style: preserve-3d;
-  /* Start with a slight angle so it looks 3D immediately */
-  transform: rotateX(-8deg) rotateY(-18deg);
-}
-
-.jar-face {
-  position: absolute;
-  backface-visibility: visible;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.jar-face img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
+/* ── WebGL 3D Model Viewer ────────────────────────────────── */
+#balm-model-viewer {
+  width: 220px;
+  height: 200px;
+  --poster-color: transparent;
+  background-color: transparent;
+  outline: none;
+  border: none;
+  cursor: grab;
   user-select: none;
-  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
-/* Front face: faces the viewer */
-.jar-front {
-  width: 160px;
-  height: 150px;
-  transform: translateZ(55px);
-}
-
-/* Back face: behind the jar */
-.jar-back {
-  width: 160px;
-  height: 150px;
-  transform: rotateY(180deg) translateZ(55px);
-}
-
-/* Left face: narrower (depth of jar) */
-.jar-left {
-  width: 110px;
-  height: 150px;
-  left: 25px;
-  transform: rotateY(-90deg) translateZ(80px) translateX(-25px);
-  transform-origin: left center;
-}
-
-/* Right face: narrower (depth of jar) */
-.jar-right {
-  width: 110px;
-  height: 150px;
-  right: 25px;
-  transform: rotateY(90deg) translateZ(80px) translateX(25px);
-  transform-origin: right center;
-}
-
-/* Top face: lid */
-.jar-top {
-  width: 160px;
-  height: 110px;
-  top: 0;
-  transform: rotateX(90deg) translateZ(75px) translateY(-20px);
-  transform-origin: center top;
-}
-
-/* Bottom face */
-.jar-bottom {
-  width: 160px;
-  height: 110px;
-  bottom: 0;
-  transform: rotateX(-90deg) translateZ(75px) translateY(20px);
-  transform-origin: center bottom;
+#balm-model-viewer:active {
+  cursor: grabbing;
 }
 
 /* Subtle cyan glow aura behind the voxel jar */

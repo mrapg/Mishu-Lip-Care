@@ -268,205 +268,81 @@ function triggerTactileVibration(isRemote = false) {
   }
 }
 
-// ── 3D Fidget Spinner — Smooth & Fun ──────────────────────
+// ── 3D Model Viewer Interactions & Fidget Controls ────────
 function initFidgetSpinner() {
-  const jarCube = document.getElementById('jar-cube');
-  if (!balmStage || !balmWrapper || !jarCube) {
-    console.log('⚠️ Fidget spinner: elements not found');
+  const mv = document.getElementById('balm-model-viewer');
+  if (!mv) {
+    console.log('⚠️ balm-model-viewer element not found');
     return;
   }
-  console.log('🌀 3D Fidget spinner initialized');
+  console.log('🌀 3D GLB Model Viewer initialized');
 
-  // Default resting angle (slight tilt so it looks 3D on load)
-  const REST_X = -8;
-  const REST_Y = -18;
-
-  // Current rotation state
-  let rotX = REST_X;
-  let rotY = REST_Y;
-
-  // Velocity for momentum
-  let velX = 0;
-  let velY = 0;
-
-  // Smooth velocity tracking (average of last few frames)
-  let velHistory = [];
-
-  let rafId = null;
-  let isDragging = false;
-  let lastX = 0;
-  let lastY = 0;
-  let lastTime = 0;
-  let totalMoveDistance = 0;
-  const TAP_THRESHOLD = 8;
-
-  // Friction: higher = more fun spinning (0.985 = spins for several seconds)
-  const FRICTION = 0.985;
-  // How sensitive drag feels
-  const DRAG_SENSITIVITY = 0.6;
-  // Min velocity before stopping
-  const MIN_VEL = 0.08;
-
+  let startX = 0;
+  let startY = 0;
+  let startTime = 0;
+  let isPointerDown = false;
   let idleTimer = null;
 
-  function applyTransform() {
-    jarCube.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
-  }
-
-  function stopIdle() {
+  function stopFloat() {
     clearTimeout(idleTimer);
     if (balmWrapper) balmWrapper.classList.remove('idle-floating');
     if (balmShadow) balmShadow.classList.remove('idle-floating');
   }
 
-  function scheduleReturnToIdle() {
+  function scheduleFloat() {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      // Smoothly ease back to the resting angle
-      const easeBack = () => {
-        const dx = REST_X - rotX;
-        const dy = REST_Y - rotY;
-        if (Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3) {
-          rotX = REST_X;
-          rotY = REST_Y;
-          applyTransform();
-          // Resume idle float animation
-          if (balmWrapper) balmWrapper.classList.add('idle-floating');
-          if (balmShadow) balmShadow.classList.add('idle-floating');
-          return;
-        }
-        rotX += dx * 0.06;
-        rotY += dy * 0.06;
-        applyTransform();
-        requestAnimationFrame(easeBack);
-      };
-      requestAnimationFrame(easeBack);
-    }, 3000);
+      if (balmWrapper) balmWrapper.classList.add('idle-floating');
+      if (balmShadow) balmShadow.classList.add('idle-floating');
+    }, 2800);
   }
 
-  // ── Momentum / Inertia Loop ──────────────────────────────
-  function spinMomentum() {
-    if (isDragging) return;
+  // Pointer down on model-viewer
+  mv.addEventListener('pointerdown', (e) => {
+    isPointerDown = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startTime = Date.now();
+    stopFloat();
+  });
 
-    rotX += velX;
-    rotY += velY;
-
-    // Clamp vertical tilt to ±70° for a nice feel
-    rotX = Math.max(-70, Math.min(70, rotX));
-
-    velX *= FRICTION;
-    velY *= FRICTION;
-
-    applyTransform();
-
-    if (Math.abs(velX) > MIN_VEL || Math.abs(velY) > MIN_VEL) {
-      rafId = requestAnimationFrame(spinMomentum);
-    } else {
-      velX = 0;
-      velY = 0;
-      scheduleReturnToIdle();
+  // Camera change event from model-viewer (fires when orbiting/spinning)
+  mv.addEventListener('camera-change', (e) => {
+    if (e.detail && e.detail.source === 'user-interaction') {
+      stopFloat();
     }
-  }
+  });
 
-  // ── Pointer Handlers ─────────────────────────────────────
-  function onDown(e) {
-    if (e.type === 'touchstart' && window.PointerEvent) return;
-    if (e.type === 'pointerdown' && e.pointerId !== undefined) {
-      try { balmStage.setPointerCapture(e.pointerId); } catch(ex) {}
+  // Pointer up on model-viewer
+  mv.addEventListener('pointerup', (e) => {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const dist = Math.hypot(dx, dy);
+    const duration = Date.now() - startTime;
+
+    // If movement < 12px and time < 350ms, it's a Tap!
+    if (dist < 12 && duration < 350) {
+      handleJarTap(e);
     }
 
-    isDragging = true;
-    totalMoveDistance = 0;
-    velHistory = [];
-    cancelAnimationFrame(rafId);
-    stopIdle();
+    scheduleFloat();
+  });
 
-    const pt = e.touches ? e.touches[0] : e;
-    lastX = pt.clientX;
-    lastY = pt.clientY;
-    lastTime = performance.now();
+  mv.addEventListener('pointercancel', () => {
+    isPointerDown = false;
+    scheduleFloat();
+  });
 
-    balmStage.classList.add('is-dragging');
-  }
-
-  function onMove(e) {
-    if (!isDragging) return;
-    if (e.type === 'touchmove' && window.PointerEvent) return;
-    if (e.cancelable) e.preventDefault();
-
-    const pt = e.touches ? e.touches[0] : e;
-    const now = performance.now();
-    const dt = Math.max(1, now - lastTime);
-
-    const dx = pt.clientX - lastX;
-    const dy = pt.clientY - lastY;
-
-    totalMoveDistance += Math.abs(dx) + Math.abs(dy);
-
-    // Apply rotation directly while dragging
-    rotY += dx * DRAG_SENSITIVITY;
-    rotX -= dy * DRAG_SENSITIVITY * 0.6;
-    rotX = Math.max(-70, Math.min(70, rotX));
-
-    applyTransform();
-
-    // Track velocity for momentum (smoothed over last ~4 frames)
-    const instantVelY = (dx * DRAG_SENSITIVITY) / (dt / 16);
-    const instantVelX = (-dy * DRAG_SENSITIVITY * 0.6) / (dt / 16);
-    velHistory.push({ vx: instantVelX, vy: instantVelY, t: now });
-    // Keep only last ~60ms of velocity samples
-    velHistory = velHistory.filter(v => now - v.t < 60);
-
-    lastX = pt.clientX;
-    lastY = pt.clientY;
-    lastTime = now;
-  }
-
-  function onUp(e) {
-    if (!isDragging) return;
-    if (e.type === 'touchend' && window.PointerEvent) return;
-    isDragging = false;
-    balmStage.classList.remove('is-dragging');
-
-    if (totalMoveDistance < TAP_THRESHOLD) {
-      // It was a tap — fire the love tap!
-      handleJarTap(null);
-      scheduleReturnToIdle();
-      return;
+  // Fallback click listener
+  mv.addEventListener('click', (e) => {
+    const duration = Date.now() - startTime;
+    if (duration < 350) {
+      handleJarTap(e);
     }
-
-    // Calculate smoothed release velocity from recent history
-    if (velHistory.length > 0) {
-      velX = velHistory.reduce((s, v) => s + v.vx, 0) / velHistory.length;
-      velY = velHistory.reduce((s, v) => s + v.vy, 0) / velHistory.length;
-    } else {
-      velX = 0;
-      velY = 0;
-    }
-
-    // Boost the release velocity slightly for extra fun
-    velX *= 1.2;
-    velY *= 1.2;
-
-    // Cap max velocity so it doesn't go crazy
-    const maxVel = 18;
-    velX = Math.max(-maxVel, Math.min(maxVel, velX));
-    velY = Math.max(-maxVel, Math.min(maxVel, velY));
-
-    // Start momentum spin!
-    rafId = requestAnimationFrame(spinMomentum);
-  }
-
-  // Pointer events
-  balmStage.addEventListener('pointerdown', onDown, { passive: false });
-  balmStage.addEventListener('pointermove', onMove, { passive: false });
-  balmStage.addEventListener('pointerup', onUp);
-  balmStage.addEventListener('pointercancel', onUp);
-
-  // Touch fallback
-  balmStage.addEventListener('touchstart', onDown, { passive: false });
-  balmStage.addEventListener('touchmove', onMove, { passive: false });
-  balmStage.addEventListener('touchend', onUp, { passive: false });
+  });
 }
 
 // ── Tap Action (vibrate + squish + broadcast) ─────────────

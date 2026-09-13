@@ -1,7 +1,7 @@
 // Vaseline Lip Care 💋 — Service Worker
 // Caches app shell & assets for 100% offline use on iPhone
 
-const CACHE_NAME = 'vaseline-care-v8';
+const CACHE_NAME = 'vaseline-care-v9';
 const ASSETS = [
   './',
   './index.html',
@@ -9,13 +9,9 @@ const ASSETS = [
   './app.js',
   './manifest.json',
   './vaseline-model.png',
+  './vaseline-model.glb',
   './lib/mqtt.min.js',
-  './textures/front.png',
-  './textures/back.png',
-  './textures/left.png',
-  './textures/right.png',
-  './textures/top.png',
-  './textures/bottom.png',
+  './lib/model-viewer.min.js',
   './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png'
