@@ -293,43 +293,30 @@ function createHeartsBurst() {
   }
 }
 
-// ── Tactile Physical Vibration (Android + iOS Support) ────
+// ── Tactile Physical Vibration ────────────────────────────
 function triggerTactileVibration(isRemote = false) {
-  // 1. Android & browsers supporting standard Vibration API
+  // 1. Android & devices supporting standard Vibration API
   if ('vibrate' in navigator) {
     try {
       if (isRemote) {
         navigator.vibrate([250, 100, 250, 100, 350]);
       } else {
-        navigator.vibrate([80, 40, 80]);
+        navigator.vibrate([60, 30, 60]);
       }
     } catch (e) {}
   }
 
-  // 2. iOS Safari / PWA haptic motor:
-  // Apple disables navigator.vibrate, so Web Notifications with vibrate pattern
-  // are the only web mechanism to trigger the iPhone physical vibration motor.
-  if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+  // 2. Incoming remote partner tap notification (only when partner taps, never for self-taps!)
+  if (isRemote && 'serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
     navigator.serviceWorker.ready.then((reg) => {
-      const title = isRemote ? '💌 Love tap received!' : '💋 Vaseline Tap!';
-      const body = isRemote ? 'Time to moisturize those gorgeous lips! 💋' : 'Love tap sent to your partner! 💖';
-      reg.showNotification(title, {
-        body: body,
+      reg.showNotification('💌 Love tap received!', {
+        body: 'Time to moisturize those gorgeous lips! 💋',
         icon: 'icons/apple-touch-icon.png',
         badge: 'icons/icon-192.png',
-        vibrate: isRemote ? [300, 100, 300, 100, 400] : [100, 50, 100],
+        vibrate: [300, 100, 300, 100, 400],
         tag: 'partner-love-tap',
         renotify: true,
         silent: false
-      }).then(() => {
-        if (!isRemote) {
-          // Auto close local tap notification after 1.5s so it doesn't linger
-          setTimeout(() => {
-            reg.getNotifications({ tag: 'partner-love-tap' }).then((notifs) => {
-              notifs.forEach(n => n.close());
-            });
-          }, 1500);
-        }
       });
     }).catch(() => {});
   }
