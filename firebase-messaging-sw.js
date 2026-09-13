@@ -6,7 +6,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'vaseline-care-v27';
+const CACHE_NAME = 'vaseline-care-v28';
 const ASSETS = [
   './',
   './index.html',
@@ -87,7 +87,12 @@ self.addEventListener('push', (event) => {
       title = data.title || data.notification?.title || data.data?.title || title;
       body = data.message || data.body || data.notification?.body || data.data?.body || body;
       tag = data.tag || data.data?.tag || tag;
-      senderName = data.from || data.data?.from || data.data?.sender || data.sender || null;
+
+      // Extract sender name, strictly ignoring numeric project sender IDs (e.g. 11302655153)
+      const candidate = data.data?.sender || data.sender || data.data?.from;
+      if (candidate && !/^\d+$/.test(candidate)) {
+        senderName = candidate;
+      }
     } catch (e) {
       body = event.data.text() || body;
     }

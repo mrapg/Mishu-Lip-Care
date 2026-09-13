@@ -589,8 +589,11 @@ function initFirebase() {
       firebaseMessaging = firebase.messaging();
 
       firebaseMessaging.onMessage((payload) => {
-        const from = payload.data?.from || (currentRole === 'Mishu' ? 'Anand' : 'Mishu');
-        handleIncomingPartnerTap({ from: from });
+        let fromName = payload.data?.sender || payload.data?.from;
+        if (!fromName || /^\d+$/.test(fromName)) {
+          fromName = (currentRole === 'Mishu' ? 'Anand' : 'Mishu');
+        }
+        handleIncomingPartnerTap({ from: fromName });
       });
 
       if (Notification.permission === 'granted') {
@@ -799,9 +802,15 @@ function handleIncomingPartnerTap(data) {
 function showPartnerToast(senderName) {
   if (!partnerToast) return;
 
-  toastTitle.textContent = `💌 Love Tap from ${senderName}!`;
-  toastMsg.textContent = `${senderName} tapped the Vaseline jar for you! 💋 Time to moisturize!`;
-  toastEmoji.textContent = senderName === 'Anand' ? '💙' : '🌸';
+  // Clean senderName: never show numeric Project Sender IDs (e.g. 11302655153)
+  let cleanName = senderName;
+  if (!cleanName || /^\d+$/.test(cleanName)) {
+    cleanName = (currentRole === 'Mishu' ? 'Anand' : 'Mishu');
+  }
+
+  toastTitle.textContent = `💌 Love Tap from ${cleanName}!`;
+  toastMsg.textContent = `${cleanName} tapped the Vaseline jar for you! 💋 Time to moisturize!`;
+  toastEmoji.textContent = cleanName === 'Anand' ? '💙' : '🌸';
 
   partnerToast.classList.add('visible');
 
@@ -1009,8 +1018,12 @@ function registerServiceWorker() {
 
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'PARTNER_TAP') {
-        if (event.data.from !== currentRole) {
-          handleIncomingPartnerTap({ from: event.data.from });
+        let sender = event.data.from;
+        if (!sender || /^\d+$/.test(sender)) {
+          sender = (currentRole === 'Mishu' ? 'Anand' : 'Mishu');
+        }
+        if (sender !== currentRole) {
+          handleIncomingPartnerTap({ from: sender });
         }
       }
     });
