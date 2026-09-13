@@ -648,6 +648,13 @@ function setRole(role) {
   triggerTactileVibration(false);
 }
 
+function updateNtfyLink() {
+  const link = document.getElementById('ntfy-ios-link');
+  if (link && pairCode) {
+    link.href = `https://ntfy.sh/${pairCode.trim().toLowerCase()}-lipcare`;
+  }
+}
+
 function savePairCode() {
   if (!pairCodeInput) return;
   const newCode = pairCodeInput.value.trim().toLowerCase();
@@ -661,6 +668,7 @@ function savePairCode() {
     }
 
     syncWithServiceWorker();
+    updateNtfyLink();
     triggerTactileVibration([60, 40, 60]);
     if (savePairBtn) {
       savePairBtn.textContent = '✓ Saved';
@@ -937,6 +945,7 @@ function init() {
   // Load saved partner settings
   if (pairCodeInput) pairCodeInput.value = pairCode;
   setRole(currentRole);
+  updateNtfyLink();
   initPartnerSync();
   setupNotificationButton();
 

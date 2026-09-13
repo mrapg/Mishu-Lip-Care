@@ -722,6 +722,27 @@ body {
   box-shadow: 1px 1px 0px var(--vaseline-navy);
 }
 
+.btn-ntfy-ios {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--vaseline-ice);
+  color: var(--vaseline-navy);
+  border: 2px solid var(--vaseline-ice-dark);
+  border-radius: var(--block-radius-sm);
+  padding: 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  transition: all var(--anim-snap);
+}
+
+.btn-ntfy-ios:active {
+  transform: translate(2px, 2px);
+}
+
 .partner-header {
   display: flex;
   align-items: center;

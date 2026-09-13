@@ -1,7 +1,7 @@
 // Vaseline Lip Care 💋 — Service Worker
 // Caches app shell & assets for 100% offline use on iPhone
 
-const CACHE_NAME = 'vaseline-care-v14';
+const CACHE_NAME = 'vaseline-care-v15';
 const ASSETS = [
   './',
   './index.html',
@@ -52,6 +52,38 @@ self.addEventListener('fetch', (event) => {
         }
       });
     })
+  );
+});
+
+// ── Native Web Push Event Listener (wakes up phone when app is closed) ──
+self.addEventListener('push', (event) => {
+  let title = 'Vaseline Lip Care 💋';
+  let body = 'Time to moisturize those gorgeous lips! 💋';
+  let tag = 'vaseline-push';
+
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      title = data.title || title;
+      body = data.message || data.body || body;
+      tag = data.tag || tag;
+    } catch (e) {
+      body = event.data.text() || body;
+    }
+  }
+
+  const options = {
+    body: body,
+    icon: './icons/apple-touch-icon.png',
+    badge: './icons/icon-192.png',
+    vibrate: [300, 100, 300, 100, 400],
+    tag: tag,
+    renotify: true,
+    data: { url: './' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
   );
 });
 
