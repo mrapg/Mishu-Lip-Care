@@ -116,7 +116,8 @@ function scheduleRemoteReminder(delayMins) {
 
 // ── Timer Logic (Timestamp-Based & Background Resilient) ───
 function startTimer(restoreFromStorage = false) {
-  if (isRunning && !restoreFromStorage) {
+  const isRestore = restoreFromStorage === true;
+  if (isRunning && !isRestore) {
     stopTimer();
     return;
   }
@@ -799,9 +800,19 @@ function registerServiceWorker() {
 }
 
 // ── Event Listeners ───────────────────────────────────────
-startBtn.addEventListener('click', startTimer);
-doneBtn.addEventListener('click', hidePopup);
-snoozeBtn.addEventListener('click', snooze);
+if (startBtn) {
+  startBtn.addEventListener('click', (e) => {
+    if (e && e.cancelable) e.preventDefault();
+    if (isRunning) {
+      stopTimer();
+    } else {
+      startTimer(false);
+    }
+  });
+}
+
+if (doneBtn) doneBtn.addEventListener('click', hidePopup);
+if (snoozeBtn) snoozeBtn.addEventListener('click', snooze);
 
 // Balm stage interaction is handled by the Fidget Spinner IIFE above
 
@@ -853,25 +864,33 @@ function setupNotificationButton() {
 }
 
 // Partner Modal Controls
-if (openPartnerModalBtn && partnerModal) {
-  openPartnerModalBtn.addEventListener('click', () => {
+function openPartnerModal(e) {
+  if (e && e.cancelable) e.preventDefault();
+  if (partnerModal) {
     partnerModal.classList.add('visible');
-  });
+  }
 }
-if (closePartnerModalBtn && partnerModal) {
-  closePartnerModalBtn.addEventListener('click', () => {
+
+function closePartnerModal(e) {
+  if (e && e.cancelable) e.preventDefault();
+  if (partnerModal) {
     partnerModal.classList.remove('visible');
-  });
+  }
 }
-if (partnerModalDoneBtn && partnerModal) {
-  partnerModalDoneBtn.addEventListener('click', () => {
-    partnerModal.classList.remove('visible');
-  });
+
+if (openPartnerModalBtn) {
+  openPartnerModalBtn.addEventListener('click', openPartnerModal);
+}
+if (closePartnerModalBtn) {
+  closePartnerModalBtn.addEventListener('click', closePartnerModal);
+}
+if (partnerModalDoneBtn) {
+  partnerModalDoneBtn.addEventListener('click', closePartnerModal);
 }
 if (partnerModal) {
   partnerModal.addEventListener('click', (e) => {
     if (e.target === partnerModal) {
-      partnerModal.classList.remove('visible');
+      closePartnerModal(e);
     }
   });
 }

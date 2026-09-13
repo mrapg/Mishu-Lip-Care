@@ -562,6 +562,15 @@ body {
   cursor: pointer;
   transition: all var(--anim-snap);
   font-family: inherit;
+  position: relative;
+  z-index: 5;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-partner-front * {
+  pointer-events: none;
 }
 
 .btn-partner-front:active {
@@ -625,15 +634,17 @@ body {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 1000;
+  z-index: 9999;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transition: opacity 0.25s ease, visibility 0.25s ease;
 }
 
 .modal-overlay.visible {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
 }
 
 .partner-modal-card {
