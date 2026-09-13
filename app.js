@@ -70,59 +70,7 @@ const pairCodeInput = document.getElementById('pair-code-input');
 const savePairBtn = document.getElementById('save-pair-btn');
 const enableNotifBtn = document.getElementById('enable-notif-btn');
 
-// ── Shared Audio Context & Auto-Unlock ─────────────────────
-let sharedAudioCtx = null;
 
-function getAudioContext() {
-  if (!sharedAudioCtx) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) {
-      sharedAudioCtx = new AudioContextClass();
-    }
-  }
-  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
-    sharedAudioCtx.resume().catch(() => {});
-  }
-  return sharedAudioCtx;
-}
-
-function unlockAudio() {
-  const ctx = getAudioContext();
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume().catch(() => {});
-  }
-}
-['touchstart', 'touchend', 'pointerdown', 'click'].forEach((evt) => {
-  window.addEventListener(evt, unlockAudio, { passive: true });
-});
-
-// ── Audio Tone Generator (Soft Chime) ─────────────────────
-function playCuteChime() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (Cute Major Arpeggio)
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-
-      const startTime = ctx.currentTime + idx * 0.1;
-      gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.18, startTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.4);
-    });
-  } catch (e) {}
-}
 
 // ── Fisher-Yates Message Shuffler ─────────────────────────
 function shuffleArray(arr) {
@@ -216,7 +164,6 @@ function fireReminder() {
   const msg = getNextMessage();
   showPopup(msg);
   sendNotification(msg);
-  playCuteChime();
 
   // Haptic feedback for iPhone / mobile
   if ('vibrate' in navigator) {
@@ -646,9 +593,6 @@ function sendPartnerTap() {
 function handleIncomingPartnerTap(data) {
   // 1. Long sweet heartbeat vibration pattern on her phone!
   triggerTactileVibration(true);
-
-  // 2. Play cute chime
-  playCuteChime();
 
   // 3. Jar squish bounce & particle burst
   if (balmWrapper) {
