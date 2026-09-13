@@ -1,12 +1,12 @@
 // ╔══════════════════════════════════════════════════════════╗
 // ║        Vaseline Lip Care 💋 — Unified Service Worker     ║
-// ║        Offline PWA Caching + Firebase Cloud Messaging    ║
+// ║        Offline PWA Caching + Native Push Notifications   ║
 // ╚══════════════════════════════════════════════════════════╝
 
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'vaseline-care-v22';
+const CACHE_NAME = 'vaseline-care-v23';
 const ASSETS = [
   './',
   './index.html',
@@ -42,7 +42,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch — cache-first strategy
+// Fetch — cache-first strategy with network fallback
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -70,40 +70,24 @@ try {
   if (!firebase.apps.length) {
     firebase.initializeApp(FIREBASE_CONFIG);
   }
-  const messaging = firebase.messaging();
-
-  messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || payload.data?.title || 'Vaseline Lip Care 💋';
-    const body = payload.notification?.body || payload.data?.body || 'Time to put Vaseline on those gorgeous lips! 💋';
-
-    const options = {
-      body: body,
-      icon: './icons/apple-touch-icon.png',
-      badge: './icons/icon-192.png',
-      vibrate: [300, 100, 300, 100, 400],
-      tag: 'partner-love-tap',
-      renotify: true,
-      data: { url: './' }
-    };
-
-    self.registration.showNotification(title, options);
-  });
 } catch (e) {
   console.log('Firebase worker init note:', e);
 }
 
-// ── Native Web Push Event Listener ────────────────────────
+// ── Single Unified Push Event Listener (No Duplicates) ────
 self.addEventListener('push', (event) => {
   let title = 'Vaseline Lip Care 💋';
   let body = 'Time to moisturize those gorgeous lips! 💋';
-  let tag = 'vaseline-push';
+  let tag = 'partner-love-tap';
+  let senderName = null;
 
   if (event.data) {
     try {
       const data = event.data.json();
-      title = data.title || data.notification?.title || title;
-      body = data.message || data.body || data.notification?.body || body;
-      tag = data.tag || tag;
+      title = data.title || data.notification?.title || data.data?.title || title;
+      body = data.message || data.body || data.notification?.body || data.data?.body || body;
+      tag = data.tag || data.data?.tag || tag;
+      senderName = data.from || data.data?.from || null;
     } catch (e) {
       body = event.data.text() || body;
     }
@@ -114,13 +98,20 @@ self.addEventListener('push', (event) => {
     icon: './icons/apple-touch-icon.png',
     badge: './icons/icon-192.png',
     vibrate: [300, 100, 300, 100, 400],
-    tag: tag,
+    tag: tag, // Collapses duplicates with identical tag
     renotify: true,
     data: { url: './' }
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    Promise.all([
+      self.registration.showNotification(title, options),
+      self.clients.matchAll({ type: 'window' }).then((clients) => {
+        if (senderName) {
+          clients.forEach((c) => c.postMessage({ type: 'PARTNER_TAP', from: senderName }));
+        }
+      })
+    ])
   );
 });
 
@@ -137,78 +128,3 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
-
-// ── Background Partner Tap Listener ───────────────────────
-let ntfyReader = null;
-
-self.addEventListener('message', (event) => {
-  const data = event.data;
-  if (!data) return;
-
-  if (data.type === 'START_NTFY_LISTENER') {
-    const topic = `${data.topic}-lipcare`;
-    startNtfyListener(topic, data.role);
-  }
-});
-
-async function startNtfyListener(topic, role) {
-  if (ntfyReader) {
-    try { ntfyReader.cancel(); } catch (e) {}
-    ntfyReader = null;
-  }
-
-  try {
-    const response = await fetch(`https://ntfy.sh/${topic}/sse?since=now`, {
-      headers: { 'Accept': 'text/event-stream' }
-    });
-
-    if (!response.ok) return;
-    const reader = response.body.getReader();
-    ntfyReader = reader;
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop() || '';
-
-      for (const block of parts) {
-        const dataLine = block.split('\n').find(l => l.startsWith('data:'));
-        if (!dataLine) continue;
-        try {
-          const msg = JSON.parse(dataLine.slice(5));
-          if (!msg || !msg.message) continue;
-
-          if (msg.time && (Date.now() / 1000 - msg.time > 15)) continue;
-          if (msg.message.startsWith(`FROM:${role}`)) continue;
-
-          let body = msg.message;
-          let senderName = 'Your partner';
-          const fromMatch = body.match(/^FROM:(\w+) /);
-          if (fromMatch) {
-            senderName = fromMatch[1];
-            body = body.replace(/^FROM:\w+ /, '');
-          }
-
-          const notifTitle = `💌 Vaseline Love Tap from ${senderName}!`;
-          self.registration.showNotification(notifTitle, {
-            body: body,
-            icon: './icons/apple-touch-icon.png',
-            badge: './icons/icon-192.png',
-            vibrate: [300, 100, 300, 100, 400],
-            tag: 'partner-love-tap',
-            renotify: true
-          });
-
-          self.clients.matchAll({ type: 'window' }).then((clients) => {
-            clients.forEach((c) => c.postMessage({ type: 'PARTNER_TAP', from: senderName }));
-          });
-        } catch (e) {}
-      }
-    }
-  } catch (err) {}
-}

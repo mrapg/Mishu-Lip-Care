@@ -130,7 +130,6 @@ function getNextMessage() {
 function scheduleRemoteReminder(delayMins) {
   if (!pairCode) return;
   const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
-  const topic = `${cleanPair}-lipcare`;
 
   // 1. Sync to Firebase Realtime Database
   if (firebaseDb) {
@@ -144,13 +143,18 @@ function scheduleRemoteReminder(delayMins) {
     } catch (e) {}
   }
 
-  // 2. Schedules push on server (delivers even when PWA is completely terminated!)
-  const delayParam = delayMins < 1 ? '15s' : `${delayMins}m`;
-  const url = `https://ntfy.sh/${topic}?title=${encodeURIComponent('Vaseline Lip Care 💋')}&priority=5&tags=kiss,droplet,sparkles&delay=${delayParam}`;
-  fetch(url, {
+  // 2. Schedules push via Cloudflare Worker Relay
+  fetch(RELAY_URL, {
     method: 'POST',
-    body: 'Time to put Vaseline on those gorgeous lips! 💋'
-  }).catch((err) => console.log('Push schedule error:', err));
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      pairCode: cleanPair,
+      from: currentRole,
+      delayMins: delayMins,
+      message: 'Time to put Vaseline on those gorgeous lips! 💋',
+      title: 'Vaseline Lip Care 💋'
+    })
+  }).catch(() => {});
 }
 
 // ── Timer Logic (Timestamp-Based & Background Resilient) ───
@@ -334,7 +338,7 @@ function createHeartsBurst() {
 
 // ── Tactile Physical Vibration ────────────────────────────
 function triggerTactileVibration(isRemote = false) {
-  // 1. Android & devices supporting standard Vibration API
+  // Android & devices supporting standard Vibration API
   if ('vibrate' in navigator) {
     try {
       if (isRemote) {
@@ -343,21 +347,6 @@ function triggerTactileVibration(isRemote = false) {
         navigator.vibrate([60, 30, 60]);
       }
     } catch (e) {}
-  }
-
-  // 2. Incoming remote partner tap notification (only when partner taps, never for self-taps!)
-  if (isRemote && 'serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
-    navigator.serviceWorker.ready.then((reg) => {
-      reg.showNotification('💌 Love tap received!', {
-        body: 'Time to moisturize those gorgeous lips! 💋',
-        icon: 'icons/apple-touch-icon.png',
-        badge: 'icons/icon-192.png',
-        vibrate: [300, 100, 300, 100, 400],
-        tag: 'partner-love-tap',
-        renotify: true,
-        silent: false
-      });
-    }).catch(() => {});
   }
 }
 
@@ -663,23 +652,16 @@ function initPartnerSync() {
 }
 
 function syncWithServiceWorker() {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({
-      type: 'START_NTFY_LISTENER',
-      topic: pairCode.trim().toLowerCase(),
-      role: currentRole
-    });
-  }
+  // Service worker unified push active
 }
 
 function sendPartnerTap() {
   const cuteReminder = getNextMessage ? getNextMessage().text : "Time to put Vaseline on those gorgeous lips! 💋";
   const cleanMsg = cuteReminder.replace(/\n/g, ' ');
   const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
-  const topic = `${cleanPair}-lipcare`;
   const now = Date.now();
 
-  // 1. Write to Firebase Realtime Database (instant real-time sync)
+  // 1. Write to Firebase Realtime Database (instant real-time sync for open app)
   if (firebaseDb) {
     try {
       firebaseDb.ref(`pairs/${cleanPair}/tap`).set({
@@ -691,7 +673,7 @@ function sendPartnerTap() {
     } catch (e) {}
   }
 
-  // 2. Post via Cloudflare Push Relay + Push Server
+  // 2. Post via Cloudflare Push Relay (delivers single clean FCM push notification)
   fetch(RELAY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -702,12 +684,6 @@ function sendPartnerTap() {
       title: `💌 Vaseline Love Tap from ${currentRole}!`
     })
   }).catch(() => {});
-
-  const pushUrl = `https://ntfy.sh/${topic}?title=${encodeURIComponent('💌 Vaseline Love Tap from ' + currentRole + '!')}&priority=5&tags=kiss,sparkles,heart`;
-  fetch(pushUrl, {
-    method: 'POST',
-    body: `FROM:${currentRole} ${cleanMsg}`
-  }).catch((err) => console.log('Push send error:', err));
 
   // 3. Broadcast via MQTT WebSocket (instant if open in foreground)
   if (mqttClient && mqttClient.connected) {
