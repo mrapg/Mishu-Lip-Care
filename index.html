@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vaseline">
+  <meta name="theme-color" content="#0047BA">
+  <meta name="description" content="Cute Vaseline reminder — keep those lips soft, moisturized & protected!">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <title>Vaseline Lip Care 💋</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@600;700&family=Silkscreen:wght@700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Partner Sync Toast Banner -->
+    <div class="partner-toast" id="partner-toast">
+      <div class="toast-content">
+        <span class="toast-emoji" id="toast-emoji">💌</span>
+        <div class="toast-text-wrap">
+          <span class="toast-title" id="toast-title">Partner Love Tap!</span>
+          <span class="toast-msg" id="toast-msg">Anand tapped the jar for you! 💋</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ HEADER ═══════════════ -->
+    <header class="header">
+      <h1 class="header-name">MISHU</h1>
+      <p class="header-sub">Lip Care</p>
+    </header>
+
+    <!-- ═══════════════ 3D VOXEL BALM SCENE ═══════════════ -->
+    <section class="balm-scene">
+      <!-- Ambient Sparkle & Drop Particles -->
+      <span class="sparkle s1">✨</span>
+      <span class="sparkle s2">💧</span>
+      <span class="sparkle s3">✨</span>
+      <span class="sparkle s4">💙</span>
+      <span class="sparkle s5">⭐</span>
+      <span class="sparkle s6">🫧</span>
+
+      <!-- 3D Floating Voxel Jar -->
+      <div class="balm-stage" id="balm-stage">
+        <div class="balm-wrapper" id="balm-wrapper">
+          <img 
+            src="vaseline-model.png" 
+            alt="Vaseline 3D Block Model" 
+            class="balm-model-img" 
+            id="balm-model-img"
+            draggable="false"
+          >
+          <div class="balm-aura"></div>
+        </div>
+        <!-- Dynamic Ground Shadow -->
+        <div class="balm-shadow"></div>
+      </div>
+
+      <div class="tap-hint" id="tap-hint">
+        <span class="tap-icon">👆</span> Tap the jar for extra love!
+      </div>
+    </section>
+
+    <!-- ═══════════════ SETTINGS PANEL ═══════════════ -->
+    <section class="settings-panel">
+      <div class="settings-block">
+        <div class="settings-header">
+          <span class="settings-icon">⏰</span>
+          <h2 class="settings-title">Remind me every</h2>
+        </div>
+
+        <div class="freq-buttons" id="freq-buttons">
+          <button class="btn btn-freq" data-mins="15">
+            <span class="freq-num">15</span>
+            <span class="freq-unit">min</span>
+          </button>
+          <button class="btn btn-freq active" data-mins="30">
+            <span class="freq-num">30</span>
+            <span class="freq-unit">min</span>
+          </button>
+          <button class="btn btn-freq" data-mins="45">
+            <span class="freq-num">45</span>
+            <span class="freq-unit">min</span>
+          </button>
+          <button class="btn btn-freq" data-mins="60">
+            <span class="freq-num">1</span>
+            <span class="freq-unit">hr</span>
+          </button>
+        </div>
+
+        <div class="custom-freq">
+          <label class="custom-label" for="custom-input">Custom interval:</label>
+          <div class="custom-input-wrap">
+            <input type="number" id="custom-input" class="input-block" min="1" max="480" placeholder="30">
+            <span class="input-suffix">mins</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Partner Tap Sync Block -->
+      <div class="settings-block partner-block">
+        <div class="partner-header">
+          <div class="partner-header-left">
+            <span class="partner-icon">💑</span>
+            <h3 class="partner-title">Partner Tap Sync</h3>
+          </div>
+          <span class="partner-status-badge" id="partner-status-badge">
+            <span class="sync-dot" id="sync-dot"></span>
+            <span id="sync-status-text">Connected</span>
+          </span>
+        </div>
+        <p class="partner-desc">Tapping the 3D jar vibrates your partner's phone in real-time!</p>
+        
+        <div class="role-selector">
+          <span class="role-label">This phone is:</span>
+          <div class="role-buttons">
+            <button type="button" class="btn btn-role active" id="role-mishu" data-role="Mishu">🌸 Mishu</button>
+            <button type="button" class="btn btn-role" id="role-anand" data-role="Anand">💙 Anand</button>
+          </div>
+        </div>
+
+        <div class="pair-code-wrap">
+          <label class="pair-label" for="pair-code-input">Sync Code:</label>
+          <div class="pair-input-group">
+            <input type="text" id="pair-code-input" class="input-block pair-input" value="mishu-anand" spellcheck="false" maxlength="20">
+            <button type="button" class="btn btn-pair-save" id="save-pair-btn">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Start / Stop Button -->
+      <button class="btn btn-start" id="start-btn">
+        <span class="btn-icon">▶️</span>
+        <span class="btn-text" id="start-btn-text">Start Reminders</span>
+      </button>
+
+      <!-- Countdown Display -->
+      <div class="countdown" id="countdown">
+        <div class="countdown-badge">NEXT APPLICATION IN</div>
+        <div class="countdown-row">
+          <span class="countdown-icon">⏳</span>
+          <span class="countdown-time" id="countdown-time">--:--</span>
+        </div>
+        <div class="countdown-progress-bar">
+          <div class="countdown-progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Status Indicator -->
+      <div class="status" id="status">
+        <span class="status-dot"></span>
+        <span class="status-text" id="status-text">Ready to moisturize</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ═══════════════ REMINDER POPUP ═══════════════ -->
+  <div class="popup-overlay" id="popup-overlay">
+    <div class="popup-card" id="popup-card">
+      <!-- Hearts & Sparkles burst container -->
+      <div class="hearts-container" id="hearts-container"></div>
+
+      <div class="popup-top-badge">
+        <span>💙 VASELINE TIME 💙</span>
+      </div>
+
+      <div class="popup-avatar-wrap">
+        <img src="vaseline-model.png" alt="Vaseline" class="popup-mini-jar" style="width: 58px; height: 52px; max-width: 58px; object-fit: contain;">
+        <div class="popup-emoji-big" id="popup-emoji-big">💋</div>
+      </div>
+
+      <p class="popup-message" id="popup-message">Time to put Vaseline on those gorgeous lips!</p>
+
+      <div class="popup-buttons">
+        <button class="btn btn-done" id="done-btn">Applied! 💋</button>
+        <button class="btn btn-snooze" id="snooze-btn">Snooze 5 min 😴</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/mqtt.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
