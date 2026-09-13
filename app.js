@@ -809,28 +809,37 @@ function requestNotificationPermission() {
 }
 
 function sendNotification(msg) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    const cleanText = msg.text.replace(/\n/g, ' ');
-    try {
-      new Notification('Vaseline Lip Care 💋', {
-        body: cleanText,
-        icon: 'icons/icon-192.png',
-        badge: 'icons/icon-192.png',
-        tag: 'vaseline-reminder',
-        renotify: true
-      });
-    } catch (e) {
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.ready.then((reg) => {
-          reg.showNotification('Vaseline Lip Care 💋', {
-            body: cleanText,
-            icon: 'icons/icon-192.png',
-            tag: 'vaseline-reminder',
-            renotify: true
-          });
-        });
+  if (!('Notification' in window)) return;
+  
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission();
+    return;
+  }
+
+  const cleanText = (typeof msg === 'string' ? msg : msg?.text || 'Time to put Vaseline on those gorgeous lips! 💋').replace(/\n/g, ' ');
+  const title = 'Vaseline Lip Care 💋';
+  const options = {
+    body: cleanText,
+    icon: 'icons/apple-touch-icon.png',
+    badge: 'icons/icon-192.png',
+    vibrate: [300, 100, 300, 100, 400],
+    tag: 'vaseline-reminder',
+    renotify: true,
+    data: { url: './' }
+  };
+
+  // 1. Primary: Service Worker Registration showNotification (iOS Safari PWA & Chrome standard)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((reg) => {
+      if (reg && reg.showNotification) {
+        reg.showNotification(title, options).catch(() => {});
       }
-    }
+    }).catch(() => {});
+  } else {
+    // 2. Fallback: Standard window Notification constructor
+    try {
+      new Notification(title, options);
+    } catch (e) {}
   }
 }
 
