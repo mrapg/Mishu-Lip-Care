@@ -100,18 +100,21 @@ function getNextMessage() {
 // ── Remote Reminder Scheduling via ntfy.sh ─────────────────
 function scheduleRemoteReminder(delayMins) {
   if (!pairCode) return;
-  const topic = `${pairCode}-lipcare`;
+  const topic = `${pairCode.trim().toLowerCase()}-lipcare`.replace(/\s+/g, '-');
   // Schedules push on ntfy.sh server (delivers even when PWA is completely terminated!)
-  fetch(`https://ntfy.sh/${topic}`, {
+  fetch('https://ntfy.sh', {
     method: 'POST',
-    headers: {
-      'Title': 'Vaseline Lip Care 💋',
-      'Priority': 'urgent',
-      'Tags': 'kiss,droplet,sparkles',
-      'Delay': `${delayMins}m`
-    },
-    body: 'Time to put Vaseline on those gorgeous lips! 💋'
-  }).catch(() => {});
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topic: topic,
+      title: 'Vaseline Lip Care 💋',
+      message: 'Time to put Vaseline on those gorgeous lips! 💋',
+      priority: 5,
+      tags: ['kiss', 'droplet', 'sparkles'],
+      delay: `${delayMins}m`,
+      click: window.location.href
+    })
+  }).catch((err) => console.log('ntfy schedule error:', err));
 }
 
 // ── Timer Logic (Timestamp-Based & Background Resilient) ───
@@ -534,18 +537,20 @@ function syncWithServiceWorker() {
 function sendPartnerTap() {
   const cuteReminder = getNextMessage ? getNextMessage().text : "Time to put Vaseline on those gorgeous lips! 💋";
   const cleanMsg = cuteReminder.replace(/\n/g, ' ');
-  const ntfyTopic = `${pairCode.trim().toLowerCase()}-lipcare`;
+  const topic = `${pairCode.trim().toLowerCase()}-lipcare`.replace(/\s+/g, '-');
 
   // 1. Post to ntfy.sh (fires OS push notifications even when Mishu's app is closed!)
-  fetch(`https://ntfy.sh/${ntfyTopic}`, {
+  fetch('https://ntfy.sh', {
     method: 'POST',
-    body: `FROM:${currentRole} ${cleanMsg}`,
-    headers: {
-      'Title': `💌 Vaseline Love Tap from ${currentRole}!`,
-      'Priority': 'urgent',
-      'Tags': 'kiss,sparkles,heart',
-      'Click': window.location.href
-    }
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topic: topic,
+      title: `💌 Vaseline Love Tap from ${currentRole}!`,
+      message: `FROM:${currentRole} ${cleanMsg}`,
+      priority: 5,
+      tags: ['kiss', 'sparkles', 'heart'],
+      click: window.location.href
+    })
   }).catch((err) => console.log('ntfy background push error:', err));
 
   // 2. Broadcast via MQTT WebSocket (instant if open in foreground)
