@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <title>Vaseline Lip Care 💋</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@600;700&family=Silkscreen:wght@700&family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
   <script type="module" src="lib/model-viewer.min.js"></script>
 </head>
 <body>
@@ -215,15 +215,24 @@
         🔔 Allow Remote Vibrations & Alerts
       </button>
 
-      <a id="ntfy-ios-link" href="https://ntfy.sh/mishu-anand-lipcare" target="_blank" rel="noopener" class="btn btn-ntfy-ios">
-        📲 24/7 iOS Lockscreen Push Link
-      </a>
+      <div class="ios-push-card">
+        <div class="ios-push-header">
+          <span class="ios-push-icon">📲</span>
+          <span class="ios-push-title">iPhone Lockscreen Push (24/7)</span>
+        </div>
+        <p class="ios-push-desc">
+          To receive reminders and love taps even when your phone is locked or app is completely closed:
+        </p>
+        <a id="ntfy-ios-link" href="https://ntfy.sh/mishu-anand-lipcare" target="_blank" rel="noopener" class="btn btn-ntfy-ios">
+          🔔 Tap to Connect iPhone Lockscreen Push
+        </a>
+      </div>
 
       <button type="button" class="btn btn-modal-done" id="partner-modal-done-btn">Done ✓</button>
     </div>
   </div>
 
   <script src="lib/mqtt.min.js"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
