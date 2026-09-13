@@ -38,6 +38,23 @@ let pairCode = localStorage.getItem('vaseline-pair-code') || 'mishu-anand';
 let mqttClient = null;
 let toastTimeout = null;
 
+// ── Firebase Configuration & State ────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCvl579wZu7MKtLmRunfZ0xJgiqpto12C8",
+  authDomain: "mishu-lipcare-df5c3.firebaseapp.com",
+  projectId: "mishu-lipcare-df5c3",
+  storageBucket: "mishu-lipcare-df5c3.firebasestorage.app",
+  messagingSenderId: "11302655153",
+  appId: "1:11302655153:web:bb5b475d0c153263253e90",
+  measurementId: "G-37PV0YQQTL"
+};
+const VAPID_KEY = "BA1XF2x6Wvb41hE_Xiw5UbX7WDRhV5Sb9caF7cBfkkcc1sig3nkDN3PpX6v6uJNTu7TvWEEOEmJRUdaN52twIyM";
+
+let firebaseApp = null;
+let firebaseDb = null;
+let firebaseMessaging = null;
+let fcmToken = null;
+
 // ── DOM Elements ──────────────────────────────────────────
 const startBtn = document.getElementById('start-btn');
 const startBtnText = document.getElementById('start-btn-text');
@@ -97,11 +114,25 @@ function getNextMessage() {
   return shuffledMessages[messageIndex++];
 }
 
-// ── Remote Reminder Scheduling via ntfy.sh ─────────────────
+// ── Remote Reminder Scheduling via Firebase & Push ─────────
 function scheduleRemoteReminder(delayMins) {
   if (!pairCode) return;
-  const topic = `${pairCode.trim().toLowerCase()}-lipcare`.replace(/\s+/g, '-');
-  // Schedules push on ntfy.sh server (delivers even when PWA is completely terminated!)
+  const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
+  const topic = `${cleanPair}-lipcare`;
+
+  // 1. Sync to Firebase Realtime Database
+  if (firebaseDb) {
+    try {
+      firebaseDb.ref(`pairs/${cleanPair}/scheduledReminder`).set({
+        targetTime: Date.now() + delayMins * 60 * 1000,
+        setBy: currentRole,
+        mins: delayMins,
+        timestamp: Date.now()
+      });
+    } catch (e) {}
+  }
+
+  // 2. Schedules push on server (delivers even when PWA is completely terminated!)
   fetch('https://ntfy.sh', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -114,7 +145,7 @@ function scheduleRemoteReminder(delayMins) {
       delay: `${delayMins}m`,
       click: window.location.href
     })
-  }).catch((err) => console.log('ntfy schedule error:', err));
+  }).catch((err) => console.log('Push schedule error:', err));
 }
 
 // ── Timer Logic (Timestamp-Based & Background Resilient) ───
@@ -457,12 +488,92 @@ function spawnTapParticle(emojis = ['💖', '💙', '💋', '✨', '💧']) {
   }, 900);
 }
 
+// ── Firebase Realtime & FCM Native Push Sync ─────────────
+function initFirebase() {
+  if (typeof firebase === 'undefined') {
+    setTimeout(initFirebase, 800);
+    return;
+  }
+
+  try {
+    if (!firebase.apps.length) {
+      firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+    } else {
+      firebaseApp = firebase.app();
+    }
+    firebaseDb = firebase.database();
+    console.log('🔥 Firebase Realtime Database connected');
+
+    const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
+    const tapRef = firebaseDb.ref(`pairs/${cleanPair}/tap`);
+
+    // Real-time listener for partner love taps
+    tapRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (!data || !data.timestamp) return;
+
+      // Ignore old events or self-sent events
+      if (Date.now() - data.timestamp > 8000) return;
+      if (data.from && data.from === currentRole) return;
+
+      handleIncomingPartnerTap(data);
+    });
+
+    // Check Firebase Messaging (Native Web Push)
+    if (typeof firebase.messaging === 'function' && firebase.messaging.isSupported()) {
+      firebaseMessaging = firebase.messaging();
+
+      firebaseMessaging.onMessage((payload) => {
+        const from = payload.data?.from || (currentRole === 'Mishu' ? 'Anand' : 'Mishu');
+        handleIncomingPartnerTap({ from: from });
+      });
+
+      if (Notification.permission === 'granted') {
+        requestFcmToken();
+      }
+    }
+  } catch (err) {
+    console.log('Firebase init error:', err);
+  }
+}
+
+async function requestFcmToken() {
+  if (!firebaseMessaging) return;
+
+  try {
+    const swReg = await navigator.serviceWorker.ready;
+    const token = await firebaseMessaging.getToken({
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swReg
+    });
+
+    if (token) {
+      fcmToken = token;
+      console.log('✅ Native Apple/FCM Push Token registered:', token);
+
+      const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
+      if (firebaseDb) {
+        firebaseDb.ref(`pairs/${cleanPair}/${currentRole}/fcmToken`).set(token);
+      }
+
+      const fcmStatusText = document.getElementById('fcm-status-text');
+      if (fcmStatusText) {
+        fcmStatusText.textContent = 'Firebase Native Push Active ⚡';
+      }
+    }
+  } catch (err) {
+    console.log('FCM token request note:', err);
+  }
+}
+
 // ── Real-Time Partner Sync (MQTT over WebSocket) ──────────
 function getMqttTopic() {
   return `vaseline-care/${pairCode.trim().toLowerCase()}/tap`;
 }
 
 function initPartnerSync() {
+  initFirebase();
+
   if (typeof mqtt === 'undefined') {
     console.log('⚠️ MQTT library not loaded, retrying...');
     setTimeout(initPartnerSync, 1000);
@@ -537,9 +648,23 @@ function syncWithServiceWorker() {
 function sendPartnerTap() {
   const cuteReminder = getNextMessage ? getNextMessage().text : "Time to put Vaseline on those gorgeous lips! 💋";
   const cleanMsg = cuteReminder.replace(/\n/g, ' ');
-  const topic = `${pairCode.trim().toLowerCase()}-lipcare`.replace(/\s+/g, '-');
+  const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
+  const topic = `${cleanPair}-lipcare`;
+  const now = Date.now();
 
-  // 1. Post to ntfy.sh (fires OS push notifications even when Mishu's app is closed!)
+  // 1. Write to Firebase Realtime Database (instant real-time sync)
+  if (firebaseDb) {
+    try {
+      firebaseDb.ref(`pairs/${cleanPair}/tap`).set({
+        from: currentRole,
+        type: 'love-tap',
+        message: cleanMsg,
+        timestamp: now
+      });
+    } catch (e) {}
+  }
+
+  // 2. Post push notification (delivers to partner even when app is closed!)
   fetch('https://ntfy.sh', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -551,19 +676,19 @@ function sendPartnerTap() {
       tags: ['kiss', 'sparkles', 'heart'],
       click: window.location.href
     })
-  }).catch((err) => console.log('ntfy background push error:', err));
+  }).catch((err) => console.log('Push send error:', err));
 
-  // 2. Broadcast via MQTT WebSocket (instant if open in foreground)
+  // 3. Broadcast via MQTT WebSocket (instant if open in foreground)
   if (mqttClient && mqttClient.connected) {
     const payload = JSON.stringify({
       from: currentRole,
       type: 'love-tap',
       message: cleanMsg,
-      timestamp: Date.now()
+      timestamp: now
     });
 
-    const topic = getMqttTopic();
-    mqttClient.publish(topic, payload, { qos: 0 }, (err) => {
+    const mqttTopic = getMqttTopic();
+    mqttClient.publish(mqttTopic, payload, { qos: 0 }, (err) => {
       if (!err) {
         console.log(`📤 Love tap sent from ${currentRole} to partner!`);
       }
@@ -848,16 +973,8 @@ function setupNotificationButton() {
     Notification.requestPermission().then((permission) => {
       updateBtnStatus();
       if (permission === 'granted') {
-        triggerTactileVibration(true);
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready.then((reg) => {
-            reg.showNotification('💋 Vibrations Enabled!', {
-              body: 'Your phone will now buzz when partner taps the jar!',
-              icon: 'icons/apple-touch-icon.png',
-              vibrate: [200, 100, 200]
-            });
-          });
-        }
+        requestFcmToken();
+        triggerTactileVibration(false);
       }
     });
   });

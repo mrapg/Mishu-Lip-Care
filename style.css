@@ -722,6 +722,20 @@ body {
   box-shadow: 1px 1px 0px var(--vaseline-navy);
 }
 
+.firebase-status-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--vaseline-ice);
+  border: 1.5px solid var(--vaseline-ice-dark);
+  border-radius: var(--block-radius-sm);
+  padding: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--vaseline-navy);
+}
+
 .ios-push-card {
   background: var(--vaseline-ice);
   border: 2px solid var(--vaseline-ice-dark);
