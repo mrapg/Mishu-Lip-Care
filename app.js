@@ -617,26 +617,49 @@ function initPartnerSync() {
   }
 }
 
-function sendPartnerTap() {
-  if (!mqttClient || !mqttClient.connected) {
-    console.log('MQTT not connected yet, tap saved locally');
-    return;
+function syncWithServiceWorker() {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'START_NTFY_LISTENER',
+      topic: pairCode.trim().toLowerCase(),
+      role: currentRole
+    });
   }
+}
 
-  const payload = JSON.stringify({
-    from: currentRole,
-    type: 'love-tap',
-    timestamp: Date.now()
-  });
+function sendPartnerTap() {
+  const cuteReminder = getNextMessage ? getNextMessage().text : "Time to put Vaseline on those gorgeous lips! 💋";
+  const cleanMsg = cuteReminder.replace(/\n/g, ' ');
+  const ntfyTopic = `${pairCode.trim().toLowerCase()}-lipcare`;
 
-  const topic = getMqttTopic();
-  mqttClient.publish(topic, payload, { qos: 0 }, (err) => {
-    if (err) {
-      console.error('Error publishing tap:', err);
-    } else {
-      console.log(`📤 Love tap sent from ${currentRole} to partner!`);
+  // 1. Post to ntfy.sh (fires OS push notifications even when Mishu's app is closed!)
+  fetch(`https://ntfy.sh/${ntfyTopic}`, {
+    method: 'POST',
+    body: `FROM:${currentRole} ${cleanMsg}`,
+    headers: {
+      'Title': `💌 Vaseline Love Tap from ${currentRole}!`,
+      'Priority': 'urgent',
+      'Tags': 'kiss,sparkles,heart',
+      'Click': window.location.href
     }
-  });
+  }).catch((err) => console.log('ntfy background push error:', err));
+
+  // 2. Broadcast via MQTT WebSocket (instant if open in foreground)
+  if (mqttClient && mqttClient.connected) {
+    const payload = JSON.stringify({
+      from: currentRole,
+      type: 'love-tap',
+      message: cleanMsg,
+      timestamp: Date.now()
+    });
+
+    const topic = getMqttTopic();
+    mqttClient.publish(topic, payload, { qos: 0 }, (err) => {
+      if (!err) {
+        console.log(`📤 Love tap sent from ${currentRole} to partner!`);
+      }
+    });
+  }
 }
 
 function handleIncomingPartnerTap(data) {
@@ -726,6 +749,7 @@ function setRole(role) {
     roleAnandBtn.classList.toggle('active', role === 'Anand');
   }
 
+  syncWithServiceWorker();
   triggerTactileVibration([70]);
 }
 
@@ -741,6 +765,7 @@ function savePairCode() {
       mqttClient.subscribe(getMqttTopic());
     }
 
+    syncWithServiceWorker();
     triggerTactileVibration([60, 40, 60]);
     if (savePairBtn) {
       savePairBtn.textContent = '✓ Saved';
@@ -829,8 +854,24 @@ function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker
       .register('./sw.js')
-      .then(() => console.log('✅ Vaseline Service Worker registered'))
+      .then((reg) => {
+        console.log('✅ Vaseline Service Worker registered');
+        if (navigator.serviceWorker.controller) {
+          syncWithServiceWorker();
+        }
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          syncWithServiceWorker();
+        });
+      })
       .catch((err) => console.log('⚠️ SW registration error:', err));
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'PARTNER_TAP') {
+        if (event.data.from !== currentRole) {
+          handleIncomingPartnerTap({ from: event.data.from });
+        }
+      }
+    });
   }
 }
 
