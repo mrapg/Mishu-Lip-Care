@@ -1,0 +1,5 @@
+key.json
+service-account.json
+make_worker.js
+worker.js
+*.pem

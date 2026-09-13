@@ -6,7 +6,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'vaseline-care-v24';
+const CACHE_NAME = 'vaseline-care-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -84,11 +84,10 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       const data = event.data.json();
-      // Support FCM v1 webpush & raw payload structures
       title = data.title || data.notification?.title || data.data?.title || title;
       body = data.message || data.body || data.notification?.body || data.data?.body || body;
       tag = data.tag || data.data?.tag || tag;
-      senderName = data.from || data.data?.from || null;
+      senderName = data.from || data.data?.from || data.data?.sender || data.sender || null;
     } catch (e) {
       body = event.data.text() || body;
     }
