@@ -333,7 +333,6 @@ function triggerTactileVibration(isRemote = false) {
     }).catch(() => {});
   }
 }
-}
 
 // ── 3D Model Viewer Interactions & Fidget Controls ────────
 function initFidgetSpinner() {
@@ -599,29 +598,6 @@ function handleIncomingPartnerTap(data) {
 
   // 4. Slide in Partner Toast Banner
   showPartnerToast(data.from);
-
-  // 5. Fire system notification WITH hardware motor vibration pattern!
-  if ('Notification' in window && Notification.permission === 'granted') {
-    const notifTitle = `💌 Vaseline Love Tap from ${data.from}!`;
-    const notifOptions = {
-      body: `${data.from} tapped the Vaseline jar for you! 💋 Keep those lips soft & moisturized!`,
-      icon: 'icons/apple-touch-icon.png',
-      badge: 'icons/icon-192.png',
-      vibrate: [300, 100, 300, 100, 400],
-      tag: 'partner-love-tap',
-      renotify: true
-    };
-
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.ready.then((reg) => {
-        reg.showNotification(notifTitle, notifOptions);
-      });
-    } else {
-      try {
-        new Notification(notifTitle, notifOptions);
-      } catch (e) {}
-    }
-  }
 }
 
 function showPartnerToast(senderName) {
