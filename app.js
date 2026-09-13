@@ -126,38 +126,26 @@ function getNextMessage() {
   return shuffledMessages[messageIndex++];
 }
 
-// ── Remote Reminder Scheduling via Firebase & Push ─────────
-function scheduleRemoteReminder(delayMins) {
+// ── Remote Reminder Sync via Firebase & Push ─────────
+function syncReminderWithFirebase(active, targetEndTime, intervalMins) {
   if (!pairCode) return;
   const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
-
-  // 1. Sync to Firebase Realtime Database
   if (firebaseDb) {
     try {
-      firebaseDb.ref(`pairs/${cleanPair}/scheduledReminder`).set({
-        targetTime: Date.now() + delayMins * 60 * 1000,
-        setBy: currentRole,
-        mins: delayMins,
-        timestamp: Date.now()
+      firebaseDb.ref(`pairs/${cleanPair}/${currentRole}/reminder`).set({
+        active: active,
+        intervalMins: intervalMins || frequencyMins,
+        targetTime: targetEndTime || 0,
+        updatedAt: Date.now()
       });
-    } catch (e) {}
+      console.log(`⏰ Remote reminder synced: active=${active}, interval=${intervalMins}m, target=${targetEndTime}`);
+    } catch (e) {
+      console.log('Firebase reminder sync note:', e);
+    }
   }
-
-  // 2. Schedules push via Cloudflare Worker Relay
-  fetch(RELAY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      pairCode: cleanPair,
-      from: currentRole,
-      delayMins: delayMins,
-      message: 'Time to put Vaseline on those gorgeous lips! 💋',
-      title: 'Vaseline Lip Care 💋'
-    })
-  }).catch(() => {});
 }
 
-// ── Timer Logic (Timestamp-Based & Background Resilient) ───
+// ── Timer Logic (Timestamp-Based & Cloud-Scheduled) ───
 function startTimer(restoreFromStorage = false) {
   const isRestore = restoreFromStorage === true;
   if (isRunning && !isRestore) {
@@ -172,7 +160,7 @@ function startTimer(restoreFromStorage = false) {
     totalSeconds = frequencyMins * 60;
     remainingSeconds = totalSeconds;
     targetEndTime = Date.now() + remainingSeconds * 1000;
-    scheduleRemoteReminder(frequencyMins);
+    syncReminderWithFirebase(true, targetEndTime, frequencyMins);
   }
 
   // Update UI to running state
@@ -209,6 +197,8 @@ function stopTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
 
+  syncReminderWithFirebase(false, 0, frequencyMins);
+
   startBtn.classList.remove('is-running');
   startBtnText.textContent = 'Start Reminders';
   startBtn.querySelector('.btn-icon').textContent = '▶️';
@@ -225,6 +215,7 @@ function resetTimer() {
   totalSeconds = frequencyMins * 60;
   remainingSeconds = totalSeconds;
   targetEndTime = Date.now() + remainingSeconds * 1000;
+  syncReminderWithFirebase(true, targetEndTime, frequencyMins);
   updateCountdownDisplay();
   saveSettings();
 }
@@ -248,10 +239,17 @@ function checkBackgroundTimer() {
 
   const now = Date.now();
   if (now >= targetEndTime) {
-    // Timer expired while app was sleeping or closed!
-    fireReminder();
+    const intervalMs = frequencyMins * 60 * 1000;
+    while (targetEndTime <= now) {
+      targetEndTime += intervalMs;
+    }
+    remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
+    updateCountdownDisplay();
+    syncReminderWithFirebase(true, targetEndTime, frequencyMins);
+    saveSettings();
+    const msg = getNextMessage();
+    showPopup(msg);
   } else {
-    // Sync remaining time with actual clock
     remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
     updateCountdownDisplay();
   }
@@ -274,7 +272,7 @@ function fireReminder() {
   totalSeconds = frequencyMins * 60;
   remainingSeconds = totalSeconds;
   targetEndTime = Date.now() + remainingSeconds * 1000;
-  scheduleRemoteReminder(frequencyMins);
+  syncReminderWithFirebase(true, targetEndTime, frequencyMins);
   saveSettings();
 }
 
@@ -310,8 +308,8 @@ function snooze() {
   totalSeconds = 5 * 60;
   remainingSeconds = totalSeconds;
   targetEndTime = Date.now() + totalSeconds * 1000;
+  syncReminderWithFirebase(true, targetEndTime, 5);
   updateCountdownDisplay();
-  scheduleRemoteReminder(5);
 
   clearInterval(timerInterval);
   timerInterval = setInterval(tickTimer, 1000);
@@ -894,9 +892,15 @@ function loadSettings() {
     const now = Date.now();
 
     if (now >= targetEndTime) {
-      // Timer finished while app was closed!
+      const intervalMs = frequencyMins * 60 * 1000;
+      while (targetEndTime <= now) {
+        targetEndTime += intervalMs;
+      }
+      remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
       startTimer(true);
-      fireReminder();
+      syncReminderWithFirebase(true, targetEndTime, frequencyMins);
+      const msg = getNextMessage();
+      showPopup(msg);
     } else {
       // Resume running seamlessly with accurate remaining seconds
       remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
