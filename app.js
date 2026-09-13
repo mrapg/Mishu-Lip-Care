@@ -374,7 +374,7 @@ function initFidgetSpinner() {
     idleTimer = setTimeout(() => {
       if (balmWrapper) balmWrapper.classList.add('idle-floating');
       if (balmShadow) balmShadow.classList.add('idle-floating');
-    }, 2800);
+    }, 4200);
   }
 
   // Pointer down on model-viewer
@@ -406,6 +406,11 @@ function initFidgetSpinner() {
     // If movement < 12px and time < 350ms, it's a Tap!
     if (dist < 12 && duration < 350) {
       handleJarTap(e);
+    } else if (dist >= 18) {
+      // User spun or flicked the jar — trigger soft haptic tick for fidget feel
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate(12); } catch (_) {}
+      }
     }
 
     scheduleFloat();
