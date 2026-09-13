@@ -291,74 +291,43 @@ function createHeartsBurst() {
   }
 }
 
-// ── Tactile Physical Vibration & Haptics ──────────────────
+// ── Tactile Physical Vibration ────────────────────────────
 function triggerTactileVibration(isRemote = false) {
-  // 1. Hardware motor vibration (Android & supporting browsers)
+  // Hardware motor vibration (Android & supporting browsers)
   if ('vibrate' in navigator) {
     try {
       if (isRemote) {
         navigator.vibrate([250, 100, 250, 100, 350]);
       } else {
-        const res = navigator.vibrate([100, 50, 100]);
-        if (!res) navigator.vibrate(120);
+        navigator.vibrate([80, 40, 80]);
       }
     } catch (e) {}
   }
 
-  // 2. Physical Acoustic Haptic Rumble (Vibrates iPhone & Android speaker housing)
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    const pulses = isRemote ? 3 : 2;
-
-    for (let i = 0; i < pulses; i++) {
-      const startTime = now + i * 0.15;
-
-      // Deep resonant pulse (140Hz -> 75Hz) - within phone speaker passband
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'triangle'; // generates rich odd harmonics for tactile vibration
-      osc.frequency.setValueAtTime(140, startTime);
-      osc.frequency.exponentialRampToValueAtTime(75, startTime + 0.11);
-
-      gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.linearRampToValueAtTime(0.9, startTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.12);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.13);
-
-      // Tactile click transient (1500Hz -> 300Hz)
-      const click = ctx.createOscillator();
-      const clickGain = ctx.createGain();
-
-      click.type = 'sine';
-      click.frequency.setValueAtTime(1500, startTime);
-      click.frequency.exponentialRampToValueAtTime(300, startTime + 0.025);
-
-      clickGain.gain.setValueAtTime(0.35, startTime);
-      clickGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.025);
-
-      click.connect(clickGain);
-      clickGain.connect(ctx.destination);
-
-      click.start(startTime);
-      click.stop(startTime + 0.03);
-    }
-  } catch (e) {
-    console.error('Haptic acoustic error:', e);
+  // On iOS: vibration API doesn't work, but Service Worker notifications
+  // with vibrate pattern DO trigger the motor. For remote taps we fire
+  // a SW notification. For local taps, visual feedback (squish) is enough.
+  if (isRemote && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.showNotification('💌 Love tap received!', {
+        body: 'Time to moisturize those gorgeous lips! 💋',
+        icon: 'icons/apple-touch-icon.png',
+        vibrate: [300, 100, 300, 100, 400],
+        tag: 'partner-love-tap',
+        renotify: true,
+        silent: false
+      });
+    }).catch(() => {});
   }
 }
 
 // ── Fidget Spinner Rotation ────────────────────────────────
-(function initFidgetSpinner() {
-  if (!balmStage || !balmWrapper) return;
+function initFidgetSpinner() {
+  if (!balmStage || !balmWrapper) {
+    console.log('⚠️ Fidget spinner: balmStage or balmWrapper not found');
+    return;
+  }
+  console.log('🌀 Fidget spinner initialized');
 
   // Current rotation angles
   let rotX = 0;
@@ -401,6 +370,7 @@ function triggerTactileVibration(isRemote = false) {
         } else {
           rotX = 0; rotY = 0;
           balmWrapper.style.transform = '';
+          balmWrapper.style.animation = '';
         }
       };
       requestAnimationFrame(easeToZero);
@@ -415,7 +385,10 @@ function triggerTactileVibration(isRemote = false) {
   }
 
   function spinInertia() {
-    if (Math.abs(velX) < 0.1 && Math.abs(velY) < 0.1) return;
+    if (Math.abs(velX) < 0.1 && Math.abs(velY) < 0.1) {
+      resumeIdle();
+      return;
+    }
     rotX += velX;
     rotY += velY;
     velX *= 0.93;
@@ -425,8 +398,11 @@ function triggerTactileVibration(isRemote = false) {
   }
 
   function onPointerDown(e) {
-    if (e.type === 'pointerdown') {
-      balmStage.setPointerCapture(e.pointerId);
+    // Prevent double-fire from both touch and pointer events
+    if (e.type === 'touchstart' && window.PointerEvent) return;
+
+    if (e.type === 'pointerdown' && e.pointerId !== undefined) {
+      try { balmStage.setPointerCapture(e.pointerId); } catch(ex) {}
     }
 
     stopIdle();
@@ -434,18 +410,21 @@ function triggerTactileVibration(isRemote = false) {
     totalMoveDistance = 0;
     cancelAnimationFrame(rafId);
 
-    startX = lastX = e.clientX ?? e.touches?.[0].clientX;
-    startY = lastY = e.clientY ?? e.touches?.[0].clientY;
+    const touch = e.touches ? e.touches[0] : e;
+    startX = lastX = touch.clientX;
+    startY = lastY = touch.clientY;
 
     balmStage.classList.add('is-dragging');
   }
 
   function onPointerMove(e) {
     if (!isDragging) return;
-    e.preventDefault();
+    if (e.type === 'touchmove' && window.PointerEvent) return;
+    if (e.cancelable) e.preventDefault();
 
-    const curX = e.clientX ?? e.touches?.[0].clientX;
-    const curY = e.clientY ?? e.touches?.[0].clientY;
+    const touch = e.touches ? e.touches[0] : e;
+    const curX = touch.clientX;
+    const curY = touch.clientY;
 
     const dx = curX - lastX;
     const dy = curY - lastY;
@@ -467,20 +446,22 @@ function triggerTactileVibration(isRemote = false) {
 
   function onPointerUp(e) {
     if (!isDragging) return;
+    if (e.type === 'touchend' && window.PointerEvent) return;
     isDragging = false;
     balmStage.classList.remove('is-dragging');
 
     if (totalMoveDistance < TAP_THRESHOLD) {
       // Short movement = it was a tap → fire the love tap!
       rotX = 0; rotY = 0;
-      applyTransform();
+      balmWrapper.style.transform = '';
+      balmWrapper.style.animation = '';
+      balmWrapper.classList.add('idle-floating');
+      if (balmShadow) balmShadow.classList.add('idle-floating');
       handleJarTap(null);
     } else {
       // Long drag = fidget spin → apply momentum inertia
       rafId = requestAnimationFrame(spinInertia);
     }
-
-    resumeIdle();
   }
 
   // Pointer events (modern, works on mobile & desktop)
@@ -493,7 +474,7 @@ function triggerTactileVibration(isRemote = false) {
   balmStage.addEventListener('touchstart', onPointerDown, { passive: false });
   balmStage.addEventListener('touchmove', onPointerMove, { passive: false });
   balmStage.addEventListener('touchend', onPointerUp, { passive: false });
-})();
+}
 
 // ── Tap Action (vibrate + squish + broadcast) ─────────────
 let lastTapTime = 0;
@@ -973,6 +954,9 @@ function init() {
   setRole(currentRole);
   initPartnerSync();
   setupNotificationButton();
+
+  // 3D fidget spinner on the jar
+  initFidgetSpinner();
 
   registerServiceWorker();
 }
