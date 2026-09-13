@@ -49,6 +49,18 @@ const FIREBASE_CONFIG = {
   measurementId: "G-37PV0YQQTL"
 };
 const VAPID_KEY = "BA1XF2x6Wvb41hE_Xiw5UbX7WDRhV5Sb9caF7cBfkkcc1sig3nkDN3PpX6v6uJNTu7TvWEEOEmJRUdaN52twIyM";
+const RELAY_URL = "https://mishu-lipcare-relay.anandprakash2274.workers.dev";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 let firebaseApp = null;
 let firebaseDb = null;
@@ -531,31 +543,53 @@ function initFirebase() {
 }
 
 async function requestFcmToken() {
-  if (!firebaseMessaging) return;
+  const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
 
-  try {
-    const swReg = await navigator.serviceWorker.ready;
-    const token = await firebaseMessaging.getToken({
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swReg
-    });
-
-    if (token) {
-      fcmToken = token;
-      console.log('✅ Native Apple/FCM Push Token registered:', token);
-
-      const cleanPair = pairCode.trim().toLowerCase().replace(/\s+/g, '-');
-      if (firebaseDb) {
-        firebaseDb.ref(`pairs/${cleanPair}/${currentRole}/fcmToken`).set(token);
+  // 1. Native WebPush subscription for Apple APNs
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    try {
+      const swReg = await navigator.serviceWorker.ready;
+      let sub = await swReg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await swReg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_KEY)
+        });
       }
-
-      const fcmStatusText = document.getElementById('fcm-status-text');
-      if (fcmStatusText) {
-        fcmStatusText.textContent = 'Firebase Native Push Active ⚡';
+      if (sub && firebaseDb) {
+        firebaseDb.ref(`pairs/${cleanPair}/${currentRole}/subscription`).set(sub.toJSON());
+        console.log('✅ Apple APNs PushSubscription registered in Firebase');
       }
+    } catch (e) {
+      console.log('Native push subscription note:', e);
     }
-  } catch (err) {
-    console.log('FCM token request note:', err);
+  }
+
+  // 2. Firebase FCM Token
+  if (firebaseMessaging) {
+    try {
+      const swReg = await navigator.serviceWorker.ready;
+      const token = await firebaseMessaging.getToken({
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: swReg
+      });
+
+      if (token) {
+        fcmToken = token;
+        console.log('✅ Native Apple/FCM Push Token registered:', token);
+
+        if (firebaseDb) {
+          firebaseDb.ref(`pairs/${cleanPair}/${currentRole}/fcmToken`).set(token);
+        }
+
+        const fcmStatusText = document.getElementById('fcm-status-text');
+        if (fcmStatusText) {
+          fcmStatusText.textContent = 'Firebase Native Push Active ⚡';
+        }
+      }
+    } catch (err) {
+      console.log('FCM token request note:', err);
+    }
   }
 }
 
@@ -657,7 +691,18 @@ function sendPartnerTap() {
     } catch (e) {}
   }
 
-  // 2. Post push notification (delivers to partner even when app is closed!)
+  // 2. Post via Cloudflare Push Relay + Push Server
+  fetch(RELAY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      pairCode: cleanPair,
+      from: currentRole,
+      message: cleanMsg,
+      title: `💌 Vaseline Love Tap from ${currentRole}!`
+    })
+  }).catch(() => {});
+
   const pushUrl = `https://ntfy.sh/${topic}?title=${encodeURIComponent('💌 Vaseline Love Tap from ' + currentRole + '!')}&priority=5&tags=kiss,sparkles,heart`;
   fetch(pushUrl, {
     method: 'POST',
