@@ -348,154 +348,81 @@ function triggerTactileVibration(isRemote = false) {
   }
 }
 
-// ── Ultra-Lightweight 50g Fidget Top Physics Engine ─────────
+// ── Free-Form 3D Fluid Fidget Interaction ──────────────────
 function initFidgetSpinner() {
   const mv = document.getElementById('balm-model-viewer');
-  const stage = document.getElementById('balm-stage');
-  if (!mv || !stage) {
-    console.log('⚠️ balm-model-viewer or stage element not found');
+  if (!mv) {
+    console.log('⚠️ balm-model-viewer element not found');
     return;
   }
-  console.log('🌀 50g Fidget Top Physics Engine initialized');
+  console.log('🌀 Fluid 3D Fidget Controls active');
 
-  let currentTheta = 0; // Horizontal rotation angle in degrees
-  let currentPhi = 75;  // Vertical tilt angle in degrees
-  let velocityTheta = 0.38; // Initial gentle idle drift
-  let isDragging = false;
-  let lastPointerX = 0;
-  let lastPointerY = 0;
-  let lastPointerTime = 0;
   let pointerStartX = 0;
   let pointerStartY = 0;
   let pointerStartTime = 0;
-  let recentDeltas = [];
-  let hapticCooldown = 0;
-  let lastHapticDegree = 0;
+  let isPointerDown = false;
+  let idleTimer = null;
+  let lastSparkleTime = 0;
 
-  // Physics constants for 50g ceramic-bearing fidget top
-  const FRICTION = 0.990;     // Extremely smooth, low-friction glide
-  const MIN_VELOCITY = 0.32;  // Gentle idle rotation speed
-  const SENSITIVITY = 0.72;   // High agility finger tracking
-  const MAX_VELOCITY = 36.0;  // High top speed cap
-
-  function physicsLoop() {
-    if (!isDragging) {
-      // Apply rotational momentum
-      currentTheta += velocityTheta;
-
-      // Wrap around 360 deg
-      if (currentTheta >= 360) currentTheta -= 360;
-      if (currentTheta < 0) currentTheta += 360;
-
-      // Damping towards idle speed
-      if (Math.abs(velocityTheta) > MIN_VELOCITY) {
-        velocityTheta *= FRICTION;
-
-        // Micro-haptics when spinning fast (ceramic ball bearing feel)
-        if (Math.abs(velocityTheta) > 4.5 && Math.abs(currentTheta - lastHapticDegree) >= 40) {
-          lastHapticDegree = currentTheta;
-          if (Date.now() - hapticCooldown > 65) {
-            hapticCooldown = Date.now();
-            if ('vibrate' in navigator) {
-              try { navigator.vibrate(5); } catch (e) {}
-            }
-          }
-        }
-      } else {
-        // Keep gentle, elegant idle spin
-        if (velocityTheta >= 0) velocityTheta = MIN_VELOCITY;
-        else velocityTheta = -MIN_VELOCITY;
-      }
-
-      // Smoothly return vertical tilt (phi) to resting 75 deg
-      currentPhi += (75 - currentPhi) * 0.08;
-
-      // Update 3D model viewer camera orbit
-      mv.cameraOrbit = `${currentTheta.toFixed(2)}deg ${currentPhi.toFixed(2)}deg auto`;
-    }
-
-    requestAnimationFrame(physicsLoop);
+  function stopFloat() {
+    clearTimeout(idleTimer);
+    if (balmWrapper) balmWrapper.classList.remove('idle-floating');
   }
 
-  // Start continuous physics loop
-  requestAnimationFrame(physicsLoop);
+  function scheduleFloat() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (balmWrapper) balmWrapper.classList.add('idle-floating');
+    }, 2200);
+  }
 
-  // Touch / Pointer Event Handlers on Stage
-  stage.addEventListener('pointerdown', (e) => {
-    isDragging = true;
+  mv.addEventListener('pointerdown', (e) => {
+    isPointerDown = true;
     pointerStartX = e.clientX;
     pointerStartY = e.clientY;
-    lastPointerX = e.clientX;
-    lastPointerY = e.clientY;
     pointerStartTime = Date.now();
-    lastPointerTime = pointerStartTime;
-    recentDeltas = [];
+    stopFloat();
+  });
 
-    if (balmWrapper) balmWrapper.classList.remove('idle-floating');
-    if (balmShadow) balmShadow.classList.remove('idle-floating');
-  }, { passive: true });
+  mv.addEventListener('camera-change', (e) => {
+    if (e.detail && e.detail.source === 'user-interaction') {
+      stopFloat();
 
-  window.addEventListener('pointermove', (e) => {
-    if (!isDragging) return;
-
-    const now = Date.now();
-    const dt = Math.max(1, now - lastPointerTime);
-    const dx = e.clientX - lastPointerX;
-    const dy = e.clientY - lastPointerY;
-
-    // Direct 1:1 finger tracking
-    currentTheta -= dx * SENSITIVITY;
-    currentPhi = Math.max(45, Math.min(105, currentPhi - dy * 0.22));
-
-    mv.cameraOrbit = `${currentTheta.toFixed(2)}deg ${currentPhi.toFixed(2)}deg auto`;
-
-    // Calculate instantaneous swipe velocity (degrees per frame)
-    const instVelocity = -(dx / dt) * 16.6 * SENSITIVITY * 1.9;
-    recentDeltas.push({ v: instVelocity, t: now });
-    if (recentDeltas.length > 5) recentDeltas.shift();
-
-    lastPointerX = e.clientX;
-    lastPointerY = e.clientY;
-    lastPointerTime = now;
-  }, { passive: true });
-
-  function handlePointerRelease(e) {
-    if (!isDragging) return;
-    isDragging = false;
-
-    const totalDist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
-    const totalTime = Date.now() - pointerStartTime;
-
-    // 1. Quick tap with minimal movement (< 12px, < 280ms) -> Love Tap!
-    if (totalDist < 12 && totalTime < 280) {
-      handleJarTap(e);
-      velocityTheta = (velocityTheta >= 0 ? 1 : -1) * 3.8; // Little celebration spin on tap
-    } else {
-      // 2. Swipe / Flick -> Launch into high-speed 50g fidget top spin!
+      // Sparkle trails on fluid spinning
       const now = Date.now();
-      const freshDeltas = recentDeltas.filter(d => now - d.t < 120);
-      if (freshDeltas.length > 0) {
-        const avgV = freshDeltas.reduce((sum, d) => sum + d.v, 0) / freshDeltas.length;
-        velocityTheta = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, avgV * 1.7));
+      if (now - lastSparkleTime > 180) {
+        lastSparkleTime = now;
+        spawnTapParticle(['✨', '⭐', '🫧', '💧']);
       }
+    }
+  });
 
-      // Light tactile click on high speed release
-      if (Math.abs(velocityTheta) > 5 && 'vibrate' in navigator) {
-        try { navigator.vibrate(10); } catch (e) {}
+  mv.addEventListener('pointerup', (e) => {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+
+    const dx = e.clientX - pointerStartX;
+    const dy = e.clientY - pointerStartY;
+    const dist = Math.hypot(dx, dy);
+    const duration = Date.now() - pointerStartTime;
+
+    // Quick tap (< 14px movement, < 320ms duration) -> Love Tap!
+    if (dist < 14 && duration < 320) {
+      handleJarTap(e);
+    } else {
+      // Light satisfying haptic tick on spin release
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate(8); } catch (err) {}
       }
     }
 
-    // Resume floating aura after resting
-    setTimeout(() => {
-      if (!isDragging && Math.abs(velocityTheta) <= MIN_VELOCITY + 0.1) {
-        if (balmWrapper) balmWrapper.classList.add('idle-floating');
-        if (balmShadow) balmShadow.classList.add('idle-floating');
-      }
-    }, 2500);
-  }
+    scheduleFloat();
+  });
 
-  window.addEventListener('pointerup', handlePointerRelease, { passive: true });
-  window.addEventListener('pointercancel', handlePointerRelease, { passive: true });
+  mv.addEventListener('pointercancel', () => {
+    isPointerDown = false;
+    scheduleFloat();
+  });
 }
 
 // ── Tap Action (vibrate + squish + broadcast) ─────────────
