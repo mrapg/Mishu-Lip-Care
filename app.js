@@ -26,6 +26,7 @@ const MESSAGES = [
 let timerInterval = null;
 let totalSeconds = 30 * 60;
 let remainingSeconds = 30 * 60;
+let targetEndTime = null;
 let frequencyMins = 30;
 let isRunning = false;
 let shuffledMessages = [];
@@ -57,7 +58,7 @@ const balmStage = document.getElementById('balm-stage');
 const balmWrapper = document.getElementById('balm-wrapper');
 const balmShadow = document.getElementById('balm-shadow');
 
-// Partner Sync Elements
+// Partner Sync Elements & Modal
 const partnerToast = document.getElementById('partner-toast');
 const toastTitle = document.getElementById('toast-title');
 const toastMsg = document.getElementById('toast-msg');
@@ -69,6 +70,12 @@ const roleAnandBtn = document.getElementById('role-anand');
 const pairCodeInput = document.getElementById('pair-code-input');
 const savePairBtn = document.getElementById('save-pair-btn');
 const enableNotifBtn = document.getElementById('enable-notif-btn');
+
+const openPartnerModalBtn = document.getElementById('open-partner-modal-btn');
+const closePartnerModalBtn = document.getElementById('close-partner-modal-btn');
+const partnerModalDoneBtn = document.getElementById('partner-modal-done-btn');
+const partnerModal = document.getElementById('partner-modal');
+const partnerFrontRole = document.getElementById('partner-front-role');
 
 
 
@@ -90,9 +97,26 @@ function getNextMessage() {
   return shuffledMessages[messageIndex++];
 }
 
-// ── Timer Logic ───────────────────────────────────────────
-function startTimer() {
-  if (isRunning) {
+// ── Remote Reminder Scheduling via ntfy.sh ─────────────────
+function scheduleRemoteReminder(delayMins) {
+  if (!pairCode) return;
+  const topic = `${pairCode}-lipcare`;
+  // Schedules push on ntfy.sh server (delivers even when PWA is completely terminated!)
+  fetch(`https://ntfy.sh/${topic}`, {
+    method: 'POST',
+    headers: {
+      'Title': 'Vaseline Lip Care 💋',
+      'Priority': 'urgent',
+      'Tags': 'kiss,droplet,sparkles',
+      'Delay': `${delayMins}m`
+    },
+    body: 'Time to put Vaseline on those gorgeous lips! 💋'
+  }).catch(() => {});
+}
+
+// ── Timer Logic (Timestamp-Based & Background Resilient) ───
+function startTimer(restoreFromStorage = false) {
+  if (isRunning && !restoreFromStorage) {
     stopTimer();
     return;
   }
@@ -100,8 +124,12 @@ function startTimer() {
   requestNotificationPermission();
 
   isRunning = true;
-  totalSeconds = frequencyMins * 60;
-  remainingSeconds = totalSeconds;
+  if (!restoreFromStorage) {
+    totalSeconds = frequencyMins * 60;
+    remainingSeconds = totalSeconds;
+    targetEndTime = Date.now() + remainingSeconds * 1000;
+    scheduleRemoteReminder(frequencyMins);
+  }
 
   // Update UI to running state
   startBtn.classList.add('is-running');
@@ -113,20 +141,27 @@ function startTimer() {
 
   updateCountdownDisplay();
 
-  timerInterval = setInterval(() => {
-    remainingSeconds--;
-    updateCountdownDisplay();
-
-    if (remainingSeconds <= 0) {
-      fireReminder();
-    }
-  }, 1000);
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tickTimer, 1000);
 
   saveSettings();
 }
 
+function tickTimer() {
+  if (!isRunning || !targetEndTime) return;
+
+  const now = Date.now();
+  remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
+  updateCountdownDisplay();
+
+  if (remainingSeconds <= 0) {
+    fireReminder();
+  }
+}
+
 function stopTimer() {
   isRunning = false;
+  targetEndTime = null;
   clearInterval(timerInterval);
   timerInterval = null;
 
@@ -138,12 +173,16 @@ function stopTimer() {
   if (progressFill) progressFill.style.width = '100%';
   status.classList.remove('active');
   statusText.textContent = 'Ready to moisturize';
+
+  saveSettings();
 }
 
 function resetTimer() {
   totalSeconds = frequencyMins * 60;
   remainingSeconds = totalSeconds;
+  targetEndTime = Date.now() + remainingSeconds * 1000;
   updateCountdownDisplay();
+  saveSettings();
 }
 
 function updateCountdownDisplay() {
@@ -159,16 +198,40 @@ function updateCountdownDisplay() {
   }
 }
 
+// ── Check Timer On App Resume / Visibility ────────────────
+function checkBackgroundTimer() {
+  if (!isRunning || !targetEndTime) return;
+
+  const now = Date.now();
+  if (now >= targetEndTime) {
+    // Timer expired while app was sleeping or closed!
+    fireReminder();
+  } else {
+    // Sync remaining time with actual clock
+    remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
+    updateCountdownDisplay();
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkBackgroundTimer();
+});
+window.addEventListener('pageshow', checkBackgroundTimer);
+window.addEventListener('focus', checkBackgroundTimer);
+
 // ── Reminder Trigger ──────────────────────────────────────
 function fireReminder() {
   const msg = getNextMessage();
   showPopup(msg);
   sendNotification(msg);
+  triggerTactileVibration(false);
 
-  // Haptic feedback for iPhone / mobile
-  if ('vibrate' in navigator) {
-    navigator.vibrate([120, 60, 120, 60, 150]);
-  }
+  // Automatically queue next interval
+  totalSeconds = frequencyMins * 60;
+  remainingSeconds = totalSeconds;
+  targetEndTime = Date.now() + remainingSeconds * 1000;
+  scheduleRemoteReminder(frequencyMins);
+  saveSettings();
 }
 
 // ── Popup Modal ───────────────────────────────────────────
@@ -190,13 +253,8 @@ function hidePopup() {
   // Resume countdown
   if (isRunning) {
     resetTimer();
-    timerInterval = setInterval(() => {
-      remainingSeconds--;
-      updateCountdownDisplay();
-      if (remainingSeconds <= 0) {
-        fireReminder();
-      }
-    }, 1000);
+    clearInterval(timerInterval);
+    timerInterval = setInterval(tickTimer, 1000);
   }
 }
 
@@ -207,17 +265,13 @@ function snooze() {
   // 5-minute snooze
   totalSeconds = 5 * 60;
   remainingSeconds = totalSeconds;
+  targetEndTime = Date.now() + totalSeconds * 1000;
   updateCountdownDisplay();
+  scheduleRemoteReminder(5);
 
-  if (!timerInterval) {
-    timerInterval = setInterval(() => {
-      remainingSeconds--;
-      updateCountdownDisplay();
-      if (remainingSeconds <= 0) {
-        fireReminder();
-      }
-    }, 1000);
-  }
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tickTimer, 1000);
+  saveSettings();
 }
 
 // ── Particle Effects (Hearts, Sparkles, Drops) ────────────
@@ -238,9 +292,9 @@ function createHeartsBurst() {
   }
 }
 
-// ── Tactile Physical Vibration ────────────────────────────
+// ── Tactile Physical Vibration (Android + iOS Support) ────
 function triggerTactileVibration(isRemote = false) {
-  // Hardware motor vibration (Android & supporting browsers)
+  // 1. Android & browsers supporting standard Vibration API
   if ('vibrate' in navigator) {
     try {
       if (isRemote) {
@@ -251,21 +305,34 @@ function triggerTactileVibration(isRemote = false) {
     } catch (e) {}
   }
 
-  // On iOS: vibration API doesn't work, but Service Worker notifications
-  // with vibrate pattern DO trigger the motor. For remote taps we fire
-  // a SW notification. For local taps, visual feedback (squish) is enough.
-  if (isRemote && 'serviceWorker' in navigator) {
+  // 2. iOS Safari / PWA haptic motor:
+  // Apple disables navigator.vibrate, so Web Notifications with vibrate pattern
+  // are the only web mechanism to trigger the iPhone physical vibration motor.
+  if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
     navigator.serviceWorker.ready.then((reg) => {
-      reg.showNotification('💌 Love tap received!', {
-        body: 'Time to moisturize those gorgeous lips! 💋',
+      const title = isRemote ? '💌 Love tap received!' : '💋 Vaseline Tap!';
+      const body = isRemote ? 'Time to moisturize those gorgeous lips! 💋' : 'Love tap sent to your partner! 💖';
+      reg.showNotification(title, {
+        body: body,
         icon: 'icons/apple-touch-icon.png',
-        vibrate: [300, 100, 300, 100, 400],
+        badge: 'icons/icon-192.png',
+        vibrate: isRemote ? [300, 100, 300, 100, 400] : [100, 50, 100],
         tag: 'partner-love-tap',
         renotify: true,
         silent: false
+      }).then(() => {
+        if (!isRemote) {
+          // Auto close local tap notification after 1.5s so it doesn't linger
+          setTimeout(() => {
+            reg.getNotifications({ tag: 'partner-love-tap' }).then((notifs) => {
+              notifs.forEach(n => n.close());
+            });
+          }, 1500);
+        }
       });
     }).catch(() => {});
   }
+}
 }
 
 // ── 3D Model Viewer Interactions & Fidget Controls ────────
@@ -596,8 +663,12 @@ function setRole(role) {
     roleAnandBtn.classList.toggle('active', role === 'Anand');
   }
 
+  if (partnerFrontRole) {
+    partnerFrontRole.textContent = role;
+  }
+
   syncWithServiceWorker();
-  triggerTactileVibration([70]);
+  triggerTactileVibration(false);
 }
 
 function savePairCode() {
@@ -675,12 +746,20 @@ function setFrequency(mins) {
 // ── Settings Persistence ──────────────────────────────────
 function saveSettings() {
   localStorage.setItem('vaseline-lipcare-freq', frequencyMins);
+  localStorage.setItem('vaseline-lipcare-running', isRunning ? 'true' : 'false');
+  if (targetEndTime && isRunning) {
+    localStorage.setItem('vaseline-lipcare-target-end', targetEndTime);
+    localStorage.setItem('vaseline-lipcare-total', totalSeconds);
+  } else {
+    localStorage.removeItem('vaseline-lipcare-target-end');
+    localStorage.removeItem('vaseline-lipcare-total');
+  }
 }
 
 function loadSettings() {
-  const saved = localStorage.getItem('vaseline-lipcare-freq');
-  if (saved) {
-    frequencyMins = parseInt(saved);
+  const savedFreq = localStorage.getItem('vaseline-lipcare-freq');
+  if (savedFreq) {
+    frequencyMins = parseInt(savedFreq);
 
     let foundPreset = false;
     freqButtons.forEach((btn) => {
@@ -692,6 +771,27 @@ function loadSettings() {
     if (!foundPreset) {
       customInput.value = frequencyMins;
       freqButtons.forEach((btn) => btn.classList.remove('active'));
+    }
+  }
+
+  // Restore running timer state if it was active when app was closed/backgrounded
+  const savedRunning = localStorage.getItem('vaseline-lipcare-running') === 'true';
+  const savedEnd = localStorage.getItem('vaseline-lipcare-target-end');
+  const savedTotal = localStorage.getItem('vaseline-lipcare-total');
+
+  if (savedRunning && savedEnd) {
+    targetEndTime = parseInt(savedEnd);
+    totalSeconds = savedTotal ? parseInt(savedTotal) : frequencyMins * 60;
+    const now = Date.now();
+
+    if (now >= targetEndTime) {
+      // Timer finished while app was closed!
+      startTimer(true);
+      fireReminder();
+    } else {
+      // Resume running seamlessly with accurate remaining seconds
+      remainingSeconds = Math.max(0, Math.round((targetEndTime - now) / 1000));
+      startTimer(true);
     }
   }
 }
@@ -773,6 +873,30 @@ function setupNotificationButton() {
         }
       }
     });
+  });
+}
+
+// Partner Modal Controls
+if (openPartnerModalBtn && partnerModal) {
+  openPartnerModalBtn.addEventListener('click', () => {
+    partnerModal.classList.add('visible');
+  });
+}
+if (closePartnerModalBtn && partnerModal) {
+  closePartnerModalBtn.addEventListener('click', () => {
+    partnerModal.classList.remove('visible');
+  });
+}
+if (partnerModalDoneBtn && partnerModal) {
+  partnerModalDoneBtn.addEventListener('click', () => {
+    partnerModal.classList.remove('visible');
+  });
+}
+if (partnerModal) {
+  partnerModal.addEventListener('click', (e) => {
+    if (e.target === partnerModal) {
+      partnerModal.classList.remove('visible');
+    }
   });
 }
 

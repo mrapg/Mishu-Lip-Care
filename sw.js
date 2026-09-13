@@ -1,7 +1,7 @@
 // Vaseline Lip Care 💋 — Service Worker
 // Caches app shell & assets for 100% offline use on iPhone
 
-const CACHE_NAME = 'vaseline-care-v10';
+const CACHE_NAME = 'vaseline-care-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -109,7 +109,8 @@ async function startNtfyListener(topic, role) {
 
   const listen = async () => {
     try {
-      const response = await fetch(`https://ntfy.sh/${topic}/sse`, {
+      // Use ?since=now so ntfy never replays old/stale messages when opening the app!
+      const response = await fetch(`https://ntfy.sh/${topic}/sse?since=now`, {
         headers: { 'Accept': 'text/event-stream' }
       });
 
@@ -133,6 +134,10 @@ async function startNtfyListener(topic, role) {
           try {
             const msg = JSON.parse(dataLine.slice(5));
             if (!msg || !msg.message) continue;
+
+            // Ignore messages older than 15 seconds (double protection against old cache)
+            if (msg.time && (Date.now() / 1000 - msg.time > 15)) continue;
+
             // Skip messages sent by self
             if (msg.message.startsWith(`FROM:${role}`)) continue;
 

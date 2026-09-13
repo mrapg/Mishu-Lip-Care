@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <title>Vaseline Lip Care 💋</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@600;700&family=Silkscreen:wght@700&family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
   <script type="module" src="lib/model-viewer.min.js"></script>
 </head>
 <body>
@@ -112,38 +112,23 @@
         </div>
       </div>
 
-      <!-- Partner Tap Sync Block -->
-      <div class="settings-block partner-block">
-        <div class="partner-header">
-          <div class="partner-header-left">
-            <span class="partner-icon">💑</span>
-            <h3 class="partner-title">Partner Tap Sync</h3>
+      <!-- Always-Visible Partner Tap Sync Front-Screen Button -->
+      <div class="partner-front-wrap">
+        <button type="button" class="btn-partner-front" id="open-partner-modal-btn">
+          <div class="partner-front-left">
+            <span class="partner-front-icon">💑</span>
+            <div class="partner-front-info">
+              <span class="partner-front-title">Partner Tap Sync</span>
+              <span class="partner-front-sub">Role: <strong id="partner-front-role">Mishu</strong></span>
+            </div>
           </div>
-          <span class="partner-status-badge" id="partner-status-badge">
-            <span class="sync-dot" id="sync-dot"></span>
-            <span id="sync-status-text">Connected</span>
-          </span>
-        </div>
-        <p class="partner-desc">Tapping the 3D jar vibrates your partner's phone in real-time!</p>
-        
-        <div class="role-selector">
-          <span class="role-label">This phone is:</span>
-          <div class="role-buttons">
-            <button type="button" class="btn btn-role active" id="role-mishu" data-role="Mishu">🌸 Mishu</button>
-            <button type="button" class="btn btn-role" id="role-anand" data-role="Anand">💙 Anand</button>
+          <div class="partner-front-right">
+            <span class="partner-status-badge" id="partner-status-badge">
+              <span class="sync-dot" id="sync-dot"></span>
+              <span id="sync-status-text">Connected</span>
+            </span>
+            <span class="partner-front-gear">⚙️</span>
           </div>
-        </div>
-
-        <div class="pair-code-wrap">
-          <label class="pair-label" for="pair-code-input">Sync Code:</label>
-          <div class="pair-input-group">
-            <input type="text" id="pair-code-input" class="input-block pair-input" value="mishu-anand" spellcheck="false" maxlength="20">
-            <button type="button" class="btn btn-pair-save" id="save-pair-btn">Save</button>
-          </div>
-        </div>
-
-        <button type="button" class="btn btn-notif-enable" id="enable-notif-btn">
-          🔔 Allow Remote Vibrations & Alerts
         </button>
       </div>
 
@@ -196,9 +181,43 @@
         <button class="btn btn-snooze" id="snooze-btn">Snooze 5 min 😴</button>
       </div>
     </div>
+  <!-- ═══════════════ PARTNER SETTINGS MODAL ═══════════════ -->
+  <div class="modal-overlay" id="partner-modal">
+    <div class="modal-card partner-modal-card">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <span class="modal-icon">💑</span>
+          <h3 class="modal-title">Partner Tap Sync</h3>
+        </div>
+        <button type="button" class="modal-close-btn" id="close-partner-modal-btn">✕</button>
+      </div>
+      <p class="partner-desc">Tapping the 3D jar vibrates your partner's phone in real-time!</p>
+      
+      <div class="role-selector">
+        <span class="role-label">This phone is:</span>
+        <div class="role-buttons">
+          <button type="button" class="btn btn-role active" id="role-mishu" data-role="Mishu">🌸 Mishu</button>
+          <button type="button" class="btn btn-role" id="role-anand" data-role="Anand">💙 Anand</button>
+        </div>
+      </div>
+
+      <div class="pair-code-wrap">
+        <label class="pair-label" for="pair-code-input">Sync Code:</label>
+        <div class="pair-input-group">
+          <input type="text" id="pair-code-input" class="input-block pair-input" value="mishu-anand" spellcheck="false" maxlength="20">
+          <button type="button" class="btn btn-pair-save" id="save-pair-btn">Save</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-notif-enable" id="enable-notif-btn">
+        🔔 Allow Remote Vibrations & Alerts
+      </button>
+
+      <button type="button" class="btn btn-modal-done" id="partner-modal-done-btn">Done ✓</button>
+    </div>
   </div>
 
   <script src="lib/mqtt.min.js"></script>
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
