@@ -1,4 +1,4 @@
-﻿// ╔══════════════════════════════════════════════════════════╗
+// ╔══════════════════════════════════════════════════════════╗
 // ║        Vaseline Lip Care 💋 — Unified Service Worker     ║
 // ║        Offline PWA Caching + Firebase Cloud Messaging    ║
 // ╚══════════════════════════════════════════════════════════╝
@@ -6,7 +6,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'vaseline-care-v20';
+const CACHE_NAME = 'vaseline-care-v21';
 const ASSETS = [
   './',
   './index.html',

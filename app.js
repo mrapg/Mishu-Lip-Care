@@ -133,18 +133,11 @@ function scheduleRemoteReminder(delayMins) {
   }
 
   // 2. Schedules push on server (delivers even when PWA is completely terminated!)
-  fetch('https://ntfy.sh', {
+  const delayParam = delayMins < 1 ? '15s' : `${delayMins}m`;
+  const url = `https://ntfy.sh/${topic}?title=${encodeURIComponent('Vaseline Lip Care 💋')}&priority=5&tags=kiss,droplet,sparkles&delay=${delayParam}`;
+  fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      topic: topic,
-      title: 'Vaseline Lip Care 💋',
-      message: 'Time to put Vaseline on those gorgeous lips! 💋',
-      priority: 5,
-      tags: ['kiss', 'droplet', 'sparkles'],
-      delay: `${delayMins}m`,
-      click: window.location.href
-    })
+    body: 'Time to put Vaseline on those gorgeous lips! 💋'
   }).catch((err) => console.log('Push schedule error:', err));
 }
 
@@ -665,17 +658,10 @@ function sendPartnerTap() {
   }
 
   // 2. Post push notification (delivers to partner even when app is closed!)
-  fetch('https://ntfy.sh', {
+  const pushUrl = `https://ntfy.sh/${topic}?title=${encodeURIComponent('💌 Vaseline Love Tap from ' + currentRole + '!')}&priority=5&tags=kiss,sparkles,heart`;
+  fetch(pushUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      topic: topic,
-      title: `💌 Vaseline Love Tap from ${currentRole}!`,
-      message: `FROM:${currentRole} ${cleanMsg}`,
-      priority: 5,
-      tags: ['kiss', 'sparkles', 'heart'],
-      click: window.location.href
-    })
+    body: `FROM:${currentRole} ${cleanMsg}`
   }).catch((err) => console.log('Push send error:', err));
 
   // 3. Broadcast via MQTT WebSocket (instant if open in foreground)
