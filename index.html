@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <title>Vaseline Lip Care 💋</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@600;700&family=Silkscreen:wght@700&family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <div id="app">
@@ -47,16 +47,17 @@
       <span class="sparkle s5">⭐</span>
       <span class="sparkle s6">🫧</span>
 
-      <!-- 3D Floating Voxel Jar -->
+      <!-- 3D Vaseline Jar Cube -->
       <div class="balm-stage" id="balm-stage">
         <div class="balm-wrapper idle-floating" id="balm-wrapper">
-          <img 
-            src="vaseline-model.png" 
-            alt="Vaseline 3D Block Model" 
-            class="balm-model-img" 
-            id="balm-model-img"
-            draggable="false"
-          >
+          <div class="jar-cube" id="jar-cube">
+            <div class="jar-face jar-front"><img src="textures/front.png" alt="Front" draggable="false"></div>
+            <div class="jar-face jar-back"><img src="textures/back.png" alt="Back" draggable="false"></div>
+            <div class="jar-face jar-left"><img src="textures/left.png" alt="Left" draggable="false"></div>
+            <div class="jar-face jar-right"><img src="textures/right.png" alt="Right" draggable="false"></div>
+            <div class="jar-face jar-top"><img src="textures/top.png" alt="Top" draggable="false"></div>
+            <div class="jar-face jar-bottom"><img src="textures/bottom.png" alt="Bottom" draggable="false"></div>
+          </div>
           <div class="balm-aura"></div>
         </div>
         <!-- Dynamic Ground Shadow -->
@@ -187,6 +188,6 @@
   </div>
 
   <script src="lib/mqtt.min.js"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

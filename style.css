@@ -202,12 +202,12 @@ body {
 .balm-scene {
   position: relative;
   width: 100%;
-  height: 240px;
+  height: 260px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  perspective: 1000px;
+  perspective: 800px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -216,7 +216,7 @@ body {
 .balm-stage {
   position: relative;
   width: 220px;
-  height: 200px;
+  height: 210px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -232,7 +232,7 @@ body {
 
 .balm-wrapper {
   position: relative;
-  width: 190px;
+  width: 180px;
   height: 170px;
   display: flex;
   align-items: center;
@@ -247,6 +247,84 @@ body {
   animation: jarFloat 3.6s ease-in-out infinite;
 }
 
+/* ── 3D Jar Cube ──────────────────────────────────────────── */
+.jar-cube {
+  position: relative;
+  width: 160px;
+  height: 150px;
+  transform-style: preserve-3d;
+  /* Start with a slight angle so it looks 3D immediately */
+  transform: rotateX(-8deg) rotateY(-18deg);
+}
+
+.jar-face {
+  position: absolute;
+  backface-visibility: visible;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jar-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Front face: faces the viewer */
+.jar-front {
+  width: 160px;
+  height: 150px;
+  transform: translateZ(55px);
+}
+
+/* Back face: behind the jar */
+.jar-back {
+  width: 160px;
+  height: 150px;
+  transform: rotateY(180deg) translateZ(55px);
+}
+
+/* Left face: narrower (depth of jar) */
+.jar-left {
+  width: 110px;
+  height: 150px;
+  left: 25px;
+  transform: rotateY(-90deg) translateZ(80px) translateX(-25px);
+  transform-origin: left center;
+}
+
+/* Right face: narrower (depth of jar) */
+.jar-right {
+  width: 110px;
+  height: 150px;
+  right: 25px;
+  transform: rotateY(90deg) translateZ(80px) translateX(25px);
+  transform-origin: right center;
+}
+
+/* Top face: lid */
+.jar-top {
+  width: 160px;
+  height: 110px;
+  top: 0;
+  transform: rotateX(90deg) translateZ(75px) translateY(-20px);
+  transform-origin: center top;
+}
+
+/* Bottom face */
+.jar-bottom {
+  width: 160px;
+  height: 110px;
+  bottom: 0;
+  transform: rotateX(-90deg) translateZ(75px) translateY(20px);
+  transform-origin: center bottom;
+}
+
 /* Subtle cyan glow aura behind the voxel jar */
 .balm-aura {
   position: absolute;
@@ -257,16 +335,6 @@ body {
   pointer-events: none;
   z-index: -1;
   animation: auraPulse 3.6s ease-in-out infinite;
-}
-
-.balm-model-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 12px rgba(0, 26, 77, 0.22));
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-drag: none;
 }
 
 /* Tap Squish / Bounce animation on click */
